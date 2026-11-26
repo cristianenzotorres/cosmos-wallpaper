@@ -7,30 +7,25 @@ workflow_dispatch:
 build:
 runs-on: ubuntu-latest
 steps:
-- name: Descargar código
+- name: Descargar codigo
 uses: actions/checkout@v4
 ​- name: Configurar Java 17
 uses: actions/setup-java@v4
 with:
 java-version: '17'
 distribution: 'temurin'
-​- name: Preparar estructura de carpetas Android
+​- name: Preparar carpetas Android
 run: |
-if [ -d "aplicación" ] && [ ! -d "app" ]; then
-cp -r "aplicación" "app"
-fi
-if [ -d "app/src/principal" ] && [ ! -d "app/src/main" ]; then
-cp -r "app/src/principal" "app/src/main"
-fi
-if [ -d "app/src/main/activos" ] && [ ! -d "app/src/main/assets" ]; then
-cp -r "app/src/main/activos" "app/src/main/assets"
-fi
-​- name: Inicializar Gradle y Compilar APK
+mkdir -p app/src/main/assets
+if [ -d "aplicación" ]; then cp -r aplicación/* app/ 2>/dev/null || true; fi
+if [ -d "app/src/principal" ]; then cp -r app/src/principal/* app/src/main/ 2>/dev/null || true; fi
+if [ -d "app/src/main/activos" ]; then cp -r app/src/main/activos/* app/src/main/assets/ 2>/dev/null || true; fi
+​- name: Compilar APK
 run: |
 gradle --no-daemon wrapper --gradle-version 8.5
 chmod +x gradlew
 ./gradlew --no-daemon assembleDebug
-​- name: Subir APK listo para descargar
+​- name: Subir APK
 uses: actions/upload-artifact@v4
 with:
 name: Cosmos-Audioritmico-APK
