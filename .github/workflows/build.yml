@@ -28,9 +28,11 @@ jobs:
 
       - name: Build debug APK
         run: |
-          gradle --no-daemon wrapper --gradle-version 8.4
+          curl -sSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o gradle.zip
+          unzip -q gradle.zip -d /opt/gradle
+          /opt/gradle/gradle-8.9/bin/gradle --no-daemon wrapper --gradle-version 8.9
           chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug -Dorg.jetbrains.kotlin.gradle.plugin.statistics.enable=false --stacktrace
+          ./gradlew --no-daemon assembleDebug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
