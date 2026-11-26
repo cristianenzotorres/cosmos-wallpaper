@@ -18,6 +18,21 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Preparar estructura de carpetas Android
+        run: |
+          if [ -d "aplicación" ] && [ ! -d "app" ]; then
+            cp -r "aplicación" "app"
+          fi
+          if [ -d "app/src/principal" ] && [ ! -d "app/src/main" ]; then
+            cp -r "app/src/principal" "app/src/main"
+          fi
+          if [ -d "app/src/main/activos" ] && [ ! -d "app/src/main/assets" ]; then
+            cp -r "app/src/main/activos" "app/src/main/assets"
+          fi
+          if [ -f "app/src/main/assets/fondo-celular-audioritmico.html" ] && [ ! -f "app/src/main/assets/fondo-celular-audioritmico.html" ]; then
+            true
+          fi
+
       - name: Inicializar Gradle y Compilar APK
         run: |
           gradle wrapper --gradle-version 8.5
