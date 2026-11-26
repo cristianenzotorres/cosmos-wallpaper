@@ -166,31 +166,34 @@ class CosmosWallpaperService : WallpaperService() {
                         cacheMode = WebSettings.LOAD_DEFAULT
                     }
 
-                    webViewClient = WebViewClient()
+                    webViewClient = object : WebViewClient() {
+    override fun onPageFinished(view: WebView, url: String) {
+        android.util.Log.d("CosmosWallpaper", "HTML cargado: $url")
+    }
 
-                    webChromeClient = object : WebChromeClient() {
-                        override fun onPermissionRequest(request: PermissionRequest) {
-                            mainHandler.post {
-                                val audioOnly =
-                                    request.resources.isNotEmpty() &&
-                                    request.resources.all {
-                                        it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
-                                    }
+    override fun onReceivedError(
+        view: WebView,
+        request: android.webkit.WebResourceRequest,
+        error: android.webkit.WebResourceError
+    ) {
+        android.util.Log.e(
+            "CosmosWallpaper",
+            "Error cargando ${request.url}: ${error.description}"
+        )
+    }
+}
 
-                                val micGranted =
-                                    ContextCompat.checkSelfPermission(
-                                        this@CosmosWallpaperService,
-                                        Manifest.permission.RECORD_AUDIO
-                                    ) == PackageManager.PERMISSION_GRANTED
+webChromeClient = object : WebChromeClient() {
+    override fun onConsoleMessage(message: android.webkit.ConsoleMessage): Boolean {
+        android.util.Log.e(
+            "CosmosWallpaper",
+            "${message.message()} (${message.sourceId()}:${message.lineNumber()})"
+        )
+        return true
+    }
 
-                                if (audioOnly && micGranted && !destroyed) {
-                                    request.grant(
-                                        arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)
-                                    )
-                                } else {
-                                    request.deny()
-                                }
-                            }
+    // Conservá aquí el onPermissionRequest existente.
+}
                         }
 
                         override fun onPermissionRequestCanceled(request: PermissionRequest) {
