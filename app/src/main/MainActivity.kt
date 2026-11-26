@@ -18,8 +18,6 @@ import android.service.wallpaper.WallpaperService
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.View
-import android.webkit.PermissionRequest
-import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -30,7 +28,6 @@ import androidx.core.content.ContextCompat
 import kotlin.concurrent.thread
 import kotlin.math.PI
 import kotlin.math.cos
-import kotlin.math.sin
 import kotlin.math.sqrt
 
 private const val STUDIO_ASSET = "file:///android_asset/Cosmos%20Generativo.html"
@@ -51,39 +48,98 @@ private fun configureWebView(view: WebView) {
 }
 
 private const val RHYTHM_NATIVE_BRIDGE = """
-(function(){
-  if(window.__cosmosNativeBridgeInstalled)return;
-  window.__cosmosNativeBridgeInstalled=true;
-  window.__cosmosNativeBands={bass:0,low:0,vocal:0,treble:0,energy:0,kick:0};
-  window.setCosmosNativeBands=function(v){window.__cosmosNativeBands=v||window.__cosmosNativeBands};
-  var meter=document.getElementById('rhythmMeterBox');if(meter)meter.classList.remove('hidden');
-  var ov=document.getElementById('cosmosNativeRhythmCanvas');
-  if(!ov){ov=document.createElement('canvas');ov.id='cosmosNativeRhythmCanvas';ov.style.cssText='position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:5';document.body.appendChild(ov)}
-  var ox=ov.getContext('2d');
-  function rez(){var d=Math.min(devicePixelRatio||1,2);ov.width=Math.round(innerWidth*d);ov.height=Math.round(innerHeight*d);ox.setTransform(d,0,0,d,0,0)}
-  addEventListener('resize',rez);rez();
-  function draw(){
-    var v=window.__cosmosNativeBands,b=v.bass||0,l=v.low||0,m=v.vocal||0,t=v.treble||0,e=v.energy||0,k=v.kick||0;
-    var ids=[['bassPct','bassBar',b],['lowMidPct','lowMidBar',l],['vocalPct','vocalBar',m],['treblePct','trebleBar',t]];
-    ids.forEach(function(x){var p=document.getElementById(x[0]),g=document.getElementById(x[1]);if(p)p.textContent=Math.round(x[2]*100)+'%';if(g)g.style.width=Math.round(x[2]*100)+'%'});
-    var status=document.getElementById('beatStatus');if(status)status.textContent=k>.35?'Bombo detectado':m>.22?'Voz / melodía':l>.22?'Bajo / acordes':t>.18?'Agudos':e>.03?'Audio en vivo':'Esperando sonido';
-    var tempo=document.getElementById('tempoBadge');if(tempo)tempo.textContent=e>.03?'MIC • '+Math.round(e*100)+'%':'-- BPM';
-    ox.clearRect(0,0,innerWidth,innerHeight);var cx=innerWidth/2,cy=innerHeight/2,base=Math.min(innerWidth,innerHeight)*(.12+b*.08),colors=['#a855f7','#ec4899','#3b82f6','#10b981','#8b5cf6'];
-    ox.save();ox.lineCap='round';for(var i=0;i<72;i++){var p=i/72,vv=(i<18?b:i<36?l:i<54?m:t)*(0.7+0.3*Math.sin(i*1.7+performance.now*.006));var a=i*Math.PI*2/72-Math.PI/2,len=8+vv*Math.min(innerWidth,innerHeight)*.22;ox.globalAlpha=.18+vv*.82;ox.strokeStyle=colors[i%colors.length];ox.lineWidth=2+vv*3;ox.beginPath();ox.moveTo(cx+Math.cos(a)*base,cy+Math.sin(a)*base);ox.lineTo(cx+Math.cos(a)*(base+len),cy+Math.sin(a)*(base+len));ox.stroke()}
-    ox.globalAlpha=.35+k*.65;ox.strokeStyle='#ec4899';ox.lineWidth=2+k*7;ox.beginPath();ox.arc(cx,cy,base+k*70,0,Math.PI*2);ox.stroke();ox.restore();requestAnimationFrame(draw)
+(function() {
+  if (window.__cosmosNativeBridgeInstalled) return;
+  window.__cosmosNativeBridgeInstalled = true;
+  window.__cosmosNativeBands = {bass:0,low:0,vocal:0,treble:0,energy:0,kick:0};
+  window.setCosmosNativeBands = function(bands) { window.__cosmosNativeBands = bands; };
+  var meter = document.getElementById('rhythmMeterBox');
+  if (meter) meter.classList.remove('hidden');
+  var canvas = document.getElementById('cosmosNativeRhythmCanvas');
+  if (!canvas) {
+    canvas = document.createElement('canvas');
+    canvas.id = 'cosmosNativeRhythmCanvas';
+    canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:5';
+    document.body.appendChild(canvas);
   }
-  requestAnimationFrame(draw);
+  var ctx = canvas.getContext('2d');
+  function resize() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.round(window.innerWidth * dpr));
+    canvas.height = Math.max(1, Math.round(window.innerHeight * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+  function render() {
+    var b = window.__cosmosNativeBands;
+    var bands = [b.bass||0, b.low||0, b.vocal||0, b.treble||0];
+    var ids = [['bassPct','bassBar'],['lowMidPct','lowMidBar'],['vocalPct','vocalBar'],['treblePct','trebleBar']];
+    ids.forEach(function(pair, index) {
+      var amount = Math.round(Math.max(0, Math.min(1, bands[index])) * 100);
+      var label = document.getElementById(pair[0]), bar = document.getElementById(pair[1]);
+      if (label) label.textContent = amount + '%';
+      if (bar) bar.style.width = amount + '%';
+    });
+    var status = document.getElementById('beatStatus');
+    if (status) status.textContent = (b.kick||0) > .3 ? 'Bombo detectado' :
+      bands[2] > .2 ? 'Voz / melodía' : bands[1] > .2 ? 'Bajo / acordes' :
+      bands[3] > .18 ? 'Agudos' : (b.energy||0) > .025 ? 'Audio en vivo' : 'Esperando sonido';
+    var tempo = document.getElementById('tempoBadge');
+    if (tempo) tempo.textContent = (b.energy||0) > .025 ? 'MIC • ' + Math.round(b.energy*100) + '%' : '-- BPM';
+
+    var width = window.innerWidth, height = window.innerHeight;
+    ctx.clearRect(0, 0, width, height);
+    var cx = width/2, cy = height/2;
+    var radius = Math.min(width,height) * (.12 + bands[0]*.08);
+    var colors = ['#a855f7','#ec4899','#3b82f6','#10b981','#8b5cf6'];
+    ctx.save(); ctx.lineCap = 'round';
+    for (var i=0; i<72; i++) {
+      var group = Math.min(3, Math.floor(i/18));
+      var energy = bands[group];
+      var angle = i * Math.PI * 2 / 72 - Math.PI / 2;
+      var length = 8 + energy * Math.min(width,height) * .24;
+      ctx.globalAlpha = .18 + energy * .82;
+      ctx.strokeStyle = colors[i % colors.length];
+      ctx.lineWidth = 2 + energy * 3;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(angle)*radius, cy + Math.sin(angle)*radius);
+      ctx.lineTo(cx + Math.cos(angle)*(radius+length), cy + Math.sin(angle)*(radius+length));
+      ctx.stroke();
+    }
+    var kick = b.kick || 0;
+    ctx.globalAlpha = .25 + kick*.7; ctx.strokeStyle = '#ec4899'; ctx.lineWidth = 2 + kick*7;
+    ctx.beginPath(); ctx.arc(cx,cy,radius+kick*70,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+  var rhythmButton = document.getElementById('rhythmToggleBtn');
+  if (rhythmButton && !rhythmButton.dataset.cosmosNativeHooked) {
+    rhythmButton.dataset.cosmosNativeHooked = '1';
+    rhythmButton.addEventListener('click', function(event) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      if (window.CosmosApp) window.CosmosApp.enableAudioReaction();
+    }, true);
+  }
+  var installButton = document.getElementById('installWallpaperBtn');
+  if (installButton && !installButton.dataset.cosmosWallpaperHooked) {
+    installButton.dataset.cosmosWallpaperHooked = '1';
+    installButton.addEventListener('click', function(event) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      if (window.CosmosApp) window.CosmosApp.setLiveWallpaper();
+    }, true);
+  }
 })();
 """
-
-private const class? = null
 
 class MainActivity : ComponentActivity() {
     private var webView: WebView? = null
     private var pendingMicAction: (() -> Unit)? = null
-    private val recording = LiveMicAnalyzer()
+    private val micAnalyzer = LiveMicAnalyzer()
 
-    private val requestMicPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    private val requestMicPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
         val action = pendingMicAction
         pendingMicAction = null
         if (granted) action?.invoke()
@@ -95,118 +151,253 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val view = WebView(this)
         webView = view
-        view.setBackgroundColor(Color.rgb(9,9,11))
+        view.setBackgroundColor(Color.rgb(9, 9, 11))
         configureWebView(view)
         view.addJavascriptInterface(AppBridge(), "CosmosApp")
         view.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
-                super.onPageFinished(view,url)
-                view?.evaluateJavascript(RHYTHM_NATIVE_BRIDGE,null)
-            }
-        }
-        view.webChromeClient = object : WebChromeClient() {
-            override fun onPermissionRequest(request: PermissionRequest) {
-                runOnUiThread {
-                    val trusted = request.origin?.scheme == "https" && request.origin?.host == "appassets.androidplatform.net"
-                    val audioOnly = request.resources.isNotEmpty() && request.resources.all { it == PermissionRequest.RESOURCE_AUDIO_CAPTURE }
-                    val mic = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                    if (trusted && audioOnly && mic) request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) else request.deny()
-                }
+                super.onPageFinished(view, url)
+                view?.evaluateJavascript(RHYTHM_NATIVE_BRIDGE, null)
             }
         }
         setContentView(view)
         view.loadUrl(STUDIO_ASSET)
     }
 
-    private fun requireMic(action: () -> Unit) {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) action()
-        else { pendingMicAction = action; requestMicPermission.launch(Manifest.permission.RECORD_AUDIO) }
+    private fun requireMicrophone(action: () -> Unit) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            action()
+        } else {
+            pendingMicAction = action
+            requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
 
     private inner class AppBridge {
         @android.webkit.JavascriptInterface
         fun enableAudioReaction() {
             runOnUiThread {
-                requireMic {
-                    if (recording.isRunning()) recording.stop()
-                    else recording.start { json -> webView?.post { webView?.evaluateJavascript("window.setCosmosNativeBands && window.setCosmosNativeBands($json)",null) } }
+                requireMicrophone {
+                    if (micAnalyzer.isRunning()) {
+                        micAnalyzer.stop()
+                        webView?.evaluateJavascript("window.setCosmosNativeBands && window.setCosmosNativeBands({bass:0,low:0,vocal:0,treble:0,energy:0,kick:0})", null)
+                    } else {
+                        micAnalyzer.start { json ->
+                            webView?.post {
+                                webView?.evaluateJavascript("window.setCosmosNativeBands && window.setCosmosNativeBands($json)", null)
+                            }
+                        }
+                    }
                 }
             }
         }
+
         @android.webkit.JavascriptInterface
         fun setLiveWallpaper() {
             runOnUiThread {
                 val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
-                    putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, ComponentName(this@MainActivity, CosmosWallpaperService::class.java))
+                    putExtra(
+                        WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                        ComponentName(this@MainActivity, CosmosWallpaperService::class.java)
+                    )
                 }
-                try { startActivity(intent) } catch (_: Exception) {
+                try {
+                    startActivity(intent)
+                } catch (_: Exception) {
                     try { startActivity(Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) }
-                    catch (_: Exception) { Toast.makeText(this@MainActivity,"No se pudo abrir el selector de fondos",Toast.LENGTH_LONG).show() }
+                    catch (_: Exception) { Toast.makeText(this@MainActivity, "No se pudo abrir el selector de fondos.", Toast.LENGTH_LONG).show() }
                 }
             }
         }
     }
 
-    override fun onDestroy(){ recording.stop(); webView?.apply{stopLoading();removeJavascriptInterface("CosmosApp");removeAllViews();destroy()}; webView=null; super.onDestroy() }
-    override fun onResume(){super.onResume();webView?.onResume()}
-    override fun onPause(){webView?.onPause();super.onPause()}
+    override fun onResume() { super.onResume(); webView?.onResume() }
+    override fun onPause() { webView?.onPause(); super.onPause() }
+    override fun onDestroy() {
+        micAnalyzer.stop()
+        webView?.apply { stopLoading(); removeJavascriptInterface("CosmosApp"); removeAllViews(); destroy() }
+        webView = null
+        super.onDestroy()
+    }
 }
 
 private class LiveMicAnalyzer {
-    @Volatile private var running=false
-    private var threadRef: Thread?=null
-    fun isRunning()=running
-    fun stop(){ running=false; threadRef?.interrupt(); threadRef=null }
+    @Volatile private var running = false
+    @Volatile private var recorder: AudioRecord? = null
+    private var worker: Thread? = null
 
-    fun start(onBands:(String)->Unit){
-        if(running)return
-        val sampleRate=16000
-        val bufferSize=AudioRecord.getMinBufferSize(sampleRate,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT)
-        val recorder=try{AudioRecord(MediaRecorder.AudioSource.MIC,sampleRate,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT,bufferSize*2)}catch(e:Exception){null}
-        if(recorder==null||recorder.state!=AudioRecord.STATE_INITIALIZED)return
-        running=true
-        threadRef=thread(name="cosmos-mic-analyzer",start=true){
-            val data=ShortArray(1024); var previousBass=0f
-            recorder.startRecording()
-            while(running&&!Thread.currentThread().isInterrupted){
-                val read=recorder.read(data,0,data.size)
-                if(read<=0)continue
-                val rms=sqrt(data.take(read).fold(0.0){sum,v->sum+v.toDouble()*v.toDouble()}/read)
-                val bass=goertzel(data,read,sampleRate,75f)
-                val low=goertzel(data,read,sampleRate,220f)
-                val vocal=goertzel(data,read,sampleRate,900f)
-                val treble=goertzel(data,read,sampleRate,5500f)
-                val energy=(rms/12000.0).toFloat().coerceIn(0f,1f)
-                val kick=(bass.coerceIn(0f,1f)-previousBass).coerceIn(0f,1f)
-                previousBass=previousBass*.82f+bass*.18f
-                val json="{\"bass\":${bass.format()},\"low\":${low.format()},\"vocal\":${vocal.format()},\"treble\":${treble.format()},\"energy\":${energy.format()},\"kick\":${kick.format()}}"
-                onBands(json)
-                Thread.sleep(25)
+    fun isRunning(): Boolean = running
+
+    @Synchronized
+    fun stop() {
+        running = false
+        try { recorder?.stop() } catch (_: IllegalStateException) {}
+        recorder?.release()
+        recorder = null
+        worker?.interrupt()
+        worker = null
+    }
+
+    @Synchronized
+    fun start(onBands: (String) -> Unit) {
+        if (running) return
+        val sampleRate = 16_000
+        val minBytes = AudioRecord.getMinBufferSize(
+            sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
+        )
+        if (minBytes <= 0) return
+        val audioRecord = try {
+            AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                sampleRate,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                maxOf(minBytes, 4096)
+            )
+        } catch (_: SecurityException) { return }
+        if (audioRecord.state != AudioRecord.STATE_INITIALIZED) {
+            audioRecord.release()
+            return
+        }
+        recorder = audioRecord
+        running = true
+        worker = thread(name = "cosmos-mic-analyzer", start = true) {
+            val samples = ShortArray(1024)
+            var bassEnvelope = 0f
+            try {
+                audioRecord.startRecording()
+                while (running && !Thread.currentThread().isInterrupted) {
+                    val count = audioRecord.read(samples, 0, samples.size)
+                    if (count <= 0) continue
+                    var squareSum = 0.0
+                    for (i in 0 until count) {
+                        val sample = samples[i].toDouble()
+                        squareSum += sample * sample
+                    }
+                    val rms = sqrt(squareSum / count)
+                    val bass = bandLevel(samples, count, sampleRate, intArrayOf(45, 65, 85, 110, 135))
+                    val low = bandLevel(samples, count, sampleRate, intArrayOf(160, 210, 270, 340, 420))
+                    val vocal = bandLevel(samples, count, sampleRate, intArrayOf(500, 700, 950, 1300, 1800, 2400))
+                    val treble = bandLevel(samples, count, sampleRate, intArrayOf(3000, 4000, 5200, 6500))
+                    val energy = (rms / 10_000.0).toFloat().coerceIn(0f, 1f)
+                    val kick = (bass - bassEnvelope - 0.04f).coerceIn(0f, 1f)
+                    bassEnvelope = bassEnvelope * 0.82f + bass * 0.18f
+                    val json = "{\"bass\":${bass},\"low\":${low},\"vocal\":${vocal},\"treble\":${treble},\"energy\":${energy},\"kick\":${kick}}"
+                    onBands(json)
+                    Thread.sleep(24)
+                }
+            } catch (_: IllegalStateException) {
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            } finally {
+                running = false
+                try { audioRecord.stop() } catch (_: IllegalStateException) {}
+                audioRecord.release()
+                if (recorder === audioRecord) recorder = null
             }
-            recorder.stop();recorder.release()
         }
     }
 
-    private fun goertzel(samples:ShortArray,count:Int,sampleRate:Int,targetHz:Float):Float{
-        val k=(0.5+count*targetHz/sampleRate).toInt();val omega=2*PI*k/count;val coeff=2*cos(omega);var s0=0.0;var s1=0.0;var s2=0.0
-        for(i in 0 until count){val x=samples[i]/32768.0;s0=x+coeff*s1-s2;s2=s1;s1=s0}
-        val power=s1*s1+s2*s2-coeff*s1*s2
-        val normalized=Math.sqrt(power)/count
-        return (normalized*5.0).toFloat().coerceIn(0f,1f)
+    private fun bandLevel(samples: ShortArray, count: Int, sampleRate: Int, frequencies: IntArray): Float {
+        if (count < 2) return 0f
+        var total = 0.0
+        for (frequency in frequencies) {
+            val bin = (0.5 + count * frequency.toDouble() / sampleRate).toInt()
+            val omega = 2.0 * PI * bin / count
+            val coefficient = 2.0 * cos(omega)
+            var previous = 0.0
+            var previous2 = 0.0
+            for (i in 0 until count) {
+                val sample = samples[i] / 32768.0
+                val current = sample + coefficient * previous - previous2
+                previous2 = previous
+                previous = current
+            }
+            val power = (previous * previous + previous2 * previous2 - coefficient * previous * previous2).coerceAtLeast(0.0)
+            total += sqrt(power) / count
+        }
+        return ((total / frequencies.size) * 18.0).toFloat().coerceIn(0f, 1f)
     }
-    private fun Float.format():String=this.toString()
 }
 
-class CosmosWallpaperService:WallpaperService(){
-    override fun onCreateEngine():Engine=CosmosEngine()
-    inner class CosmosEngine:Engine(){
-        private val handler=Handler(Looper.getMainLooper());private var view:WebView?=null;private var pending=false;private var destroyed=false
-        private val frame=object:Runnable{override fun run(){pending=false;if(destroyed||!isVisible)return;view?.invalidate();var c:Canvas?=null;try{c=surfaceHolder.lockCanvas();if(c!=null)view?.draw(c)}catch(_:Exception){}finally{if(c!=null)try{surfaceHolder.unlockCanvasAndPost(c)}catch(_:Exception){}}schedule()} }
-        @SuppressLint("SetJavaScriptEnabled") override fun onCreate(holder:SurfaceHolder?){super.onCreate(holder);setTouchEventsEnabled(true);val v=WebView(this@CosmosWallpaperService);view=v;v.setBackgroundColor(Color.BLACK);v.setLayerType(View.LAYER_TYPE_SOFTWARE,null);configureWebView(v);v.webViewClient=object:WebViewClient(){override fun onPageFinished(v:WebView?,url:String?){super.onPageFinished(v,url);v?.evaluateJavascript(RHYTHM_NATIVE_BRIDGE,null)}};v.loadUrl(STUDIO_ASSET)}
-        override fun onSurfaceChanged(holder:SurfaceHolder?,format:Int,width:Int,height:Int){super.onSurfaceChanged(holder,format,width,height);val v=view?:return;v.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY));v.layout(0,0,width,height);v.evaluateJavascript("if(typeof resizeCanvas==='function')resizeCanvas()",null);schedule()}
-        override fun onVisibilityChanged(visible:Boolean){super.onVisibilityChanged(visible);if(visible)schedule()else{handler.removeCallbacks(frame);pending=false}}
-        override fun onTouchEvent(event:MotionEvent){view?.dispatchTouchEvent(event);super.onTouchEvent(event)}
-        private fun schedule(){if(destroyed||!isVisible||pending||view==null)return;pending=true;handler.postDelayed(frame,16)}
-        override fun onDestroy(){destroyed=true;handler.removeCallbacks(frame);pending=false;view?.apply{stopLoading();removeAllViews();destroy()};view=null;super.onDestroy()}
+class CosmosWallpaperService : WallpaperService() {
+    override fun onCreateEngine(): Engine = CosmosEngine()
+
+    inner class CosmosEngine : Engine() {
+        private val handler = Handler(Looper.getMainLooper())
+        private var webView: WebView? = null
+        private var framePending = false
+        private var destroyed = false
+
+        private val drawFrame = object : Runnable {
+            override fun run() {
+                framePending = false
+                val view = webView ?: return
+                if (destroyed || !isVisible) return
+                view.invalidate()
+                var canvas: Canvas? = null
+                try {
+                    canvas = surfaceHolder.lockCanvas()
+                    if (canvas != null) view.draw(canvas)
+                } catch (_: Exception) {
+                } finally {
+                    if (canvas != null) try { surfaceHolder.unlockCanvasAndPost(canvas) } catch (_: Exception) {}
+                }
+                scheduleFrame()
+            }
+        }
+
+        @SuppressLint("SetJavaScriptEnabled")
+        override fun onCreate(surfaceHolder: SurfaceHolder?) {
+            super.onCreate(surfaceHolder)
+            setTouchEventsEnabled(true)
+            val view = WebView(this@CosmosWallpaperService)
+            webView = view
+            view.setBackgroundColor(Color.BLACK)
+            view.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+            configureWebView(view)
+            view.webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    view?.evaluateJavascript(RHYTHM_NATIVE_BRIDGE, null)
+                }
+            }
+            view.loadUrl(STUDIO_ASSET)
+        }
+
+        override fun onSurfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
+            super.onSurfaceChanged(holder, format, width, height)
+            if (width > 0 && height > 0) {
+                webView?.apply {
+                    measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+                    layout(0, 0, width, height)
+                    evaluateJavascript("if(typeof resizeCanvas==='function')resizeCanvas()", null)
+                }
+            }
+            scheduleFrame()
+        }
+
+        override fun onVisibilityChanged(visible: Boolean) {
+            super.onVisibilityChanged(visible)
+            if (visible) { webView?.onResume(); scheduleFrame() }
+            else { handler.removeCallbacks(drawFrame); framePending = false; webView?.onPause() }
+        }
+
+        override fun onTouchEvent(event: MotionEvent) { webView?.dispatchTouchEvent(event); super.onTouchEvent(event) }
+
+        private fun scheduleFrame() {
+            if (destroyed || !isVisible || framePending || webView == null) return
+            framePending = true
+            handler.postDelayed(drawFrame, 16L)
+        }
+
+        override fun onDestroy() {
+            destroyed = true
+            handler.removeCallbacks(drawFrame)
+            framePending = false
+            webView?.apply { stopLoading(); onPause(); removeAllViews(); destroy() }
+            webView = null
+            super.onDestroy()
+        }
     }
 }
