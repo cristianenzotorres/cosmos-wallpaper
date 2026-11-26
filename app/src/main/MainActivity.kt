@@ -36,7 +36,11 @@ class MainActivity : ComponentActivity() {
         val action = pendingMicAction
         pendingMicAction = null
         if (granted) action?.invoke()
-        else Toast.makeText(this, "El estudio funciona sin el permiso de micrófono.", Toast.LENGTH_LONG).show()
+        else Toast.makeText(
+            this,
+            "El modo audiorítmico necesita permiso de micrófono. Puedes seguir usando las demás opciones.",
+            Toast.LENGTH_LONG
+        ).show()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -56,37 +60,12 @@ class MainActivity : ComponentActivity() {
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         }
         view.addJavascriptInterface(AppBridge(), "CosmosApp")
-
         view.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                val script = """
-                    (function() {
-                        var install = document.getElementById('installWallpaperBtn');
-                        if (install && !install.dataset.nativeHooked) {
-                            install.dataset.nativeHooked = 'true';
-                            install.addEventListener('click', function(event) {
-                                event.preventDefault();
-                                event.stopImmediatePropagation();
-                                CosmosApp.setLiveWallpaper();
-                            }, true);
-                        }
-                        var rhythm = document.getElementById('rhythmToggleBtn');
-                        if (rhythm && !rhythm.dataset.nativeHooked) {
-                            rhythm.dataset.nativeHooked = 'true';
-                            rhythm.addEventListener('click', function(event) {
-                                event.preventDefault();
-                                event.stopImmediatePropagation();
-                                CosmosApp.enableAudioReaction();
-                            }, true);
-                        }
-                        if (typeof resizeCanvas === 'function') resizeCanvas();
-                    })();
-                """.trimIndent()
-                view?.evaluateJavascript(script, null)
+                view?.evaluateJavascript(INTERFACE_SCRIPT, null)
             }
         }
-
         view.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) {
                 runOnUiThread {
@@ -98,7 +77,9 @@ class MainActivity : ComponentActivity() {
                     ) == PackageManager.PERMISSION_GRANTED
                     if (audioOnly && micGranted) {
                         request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
-                    } else request.deny()
+                    } else {
+                        request.deny()
+                    }
                 }
             }
         }
@@ -110,8 +91,9 @@ class MainActivity : ComponentActivity() {
     private fun requireMicrophone(onGranted: () -> Unit) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
-        ) onGranted()
-        else {
+        ) {
+            onGranted()
+        } else {
             pendingMicAction = onGranted
             requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
         }
@@ -138,7 +120,14 @@ class MainActivity : ComponentActivity() {
     private inner class AppBridge {
         @android.webkit.JavascriptInterface
         fun enableAudioReaction() {
-            runOnUiThread { requireMicrophone { webView?.evaluateJavascript("window.toggleRhythmMode && window.toggleRhythmMode();", null) } }
+            runOnUiThread {
+                requireMicrophone {
+                    webView?.evaluateJavascript(
+                        "window.toggleRhythmMode && window.toggleRhythmMode();",
+                        null
+                    )
+                }
+            }
         }
 
         @android.webkit.JavascriptInterface
@@ -167,6 +156,121 @@ class MainActivity : ComponentActivity() {
         webView = null
         super.onDestroy()
     }
+
+    private companion object {
+        val INTERFACE_SCRIPT = """
+            (function() {
+                var rhythm = document.getElementById('rhythmToggleBtn');
+                if (rhythm && !rhythm.dataset.nativeHooked) {
+                    rhythm.dataset.nativeHooked = 'true';
+                    rhythm.addEventListener('click', function(event) {
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+                        CosmosApp.enableAudioReaction();
+                    }, true);
+                }
+
+                // The provided HTML did not attach a handler to its audio button.
+                // Add a small Web Audio instrument directly in the trusted click handler.
+                var audioButton = document.getElementById('audioToggleBtn');
+                var audioOff = document.getElementById('audioIconOff');
+                var audioOn = document.getElementById('audioIconOn');
+                if (audioButton && !audioButton.dataset.audioHooked) {
+                    audioButton.dataset.audioHooked = 'true';
+                    var audioContext = null;
+                    var oscillators = [];
+                    var master = null;
+                    var selectedTheme = 'angels';
+                    var themes = {
+                        angels: { wave: 'sine', notes: [261.63, 329.63, 392.00, 523.25] },
+                        soul: { wave: 'triangle', notes: [293.66, 369.99, 440.00, 587.33] },
+                        cosmos: { wave: 'sine', notes: [130.81, 196.00, 261.63, 392.00] },
+                        sanctuary: { wave: 'sine', notes: [164.81, 220.00, 277.18, 329.63] },
+                        crystal: { wave: 'triangle', notes: [392.00, 493.88, 587.33, 783.99] },
+                        rain: { wave: 'sine', notes: [110.00, 164.81, 220.00, 329.63] },
+                        aurora: { wave: 'triangle', notes: [174.61, 261.63, 349.23, 440.00] },
+                        eternity: { wave: 'sine', notes: [98.00, 146.83, 196.00, 293.66] }
+                    };
+                    var timer = null;
+                    var noteIndex = 0;
+                    function stopAudio() {
+                        if (timer) { clearInterval(timer); timer = null; }
+                        if (master && audioContext) {
+                            master.gain.cancelScheduledValues(audioContext.currentTime);
+                            master.gain.setTargetAtTime(0, audioContext.currentTime, 0.12);
+                        }
+                        oscillators.forEach(function(osc) { try { osc.stop(); } catch (_) {} });
+                        oscillators = [];
+                        if (audioContext) { audioContext.close().catch(function(){}); audioContext = null; }
+                        master = null;
+                        if (audioOff) audioOff.classList.remove('hidden');
+                        if (audioOn) audioOn.classList.add('hidden');
+                        audioButton.dataset.audioActive = 'false';
+                    }
+                    function startAudio() {
+                        var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                        if (!AudioContextClass) return;
+                        audioContext = new AudioContextClass();
+                        var profile = themes[selectedTheme] || themes.angels;
+                        master = audioContext.createGain();
+                        master.gain.value = 0.0001;
+                        master.connect(audioContext.destination);
+                        profile.notes.forEach(function(freq, index) {
+                            var osc = audioContext.createOscillator();
+                            var voiceGain = audioContext.createGain();
+                            osc.type = profile.wave;
+                            osc.frequency.value = freq;
+                            voiceGain.gain.value = index === 0 ? 0.14 : 0.055;
+                            osc.connect(voiceGain);
+                            voiceGain.connect(master);
+                            osc.start();
+                            oscillators.push(osc);
+                        });
+                        master.gain.setTargetAtTime(0.55, audioContext.currentTime, 0.3);
+                        timer = setInterval(function() {
+                            if (!audioContext || !oscillators.length) return;
+                            var current = themes[selectedTheme] || themes.angels;
+                            noteIndex = (noteIndex + 1) % current.notes.length;
+                            oscillators.forEach(function(osc, index) {
+                                osc.type = current.wave;
+                                osc.frequency.setTargetAtTime(current.notes[(noteIndex + index) % current.notes.length], audioContext.currentTime, 0.35);
+                            });
+                        }, 1800);
+                        if (audioOff) audioOff.classList.add('hidden');
+                        if (audioOn) audioOn.classList.remove('hidden');
+                        audioButton.dataset.audioActive = 'true';
+                    }
+                    audioButton.addEventListener('click', function(event) {
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+                        if (audioButton.dataset.audioActive === 'true') stopAudio();
+                        else startAudio();
+                    }, true);
+
+                    var panel = document.getElementById('controlPanel');
+                    if (panel && !document.getElementById('soundThemeSelect')) {
+                        var section = document.createElement('div');
+                        section.className = 'space-y-1.5';
+                        section.innerHTML = '<label for="soundThemeSelect" class="block text-xs font-medium text-zinc-300">Atmósfera sonora</label>' +
+                            '<select id="soundThemeSelect" class="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-white">' +
+                            '<option value="angels">Ángeles</option><option value="soul">Alma</option><option value="cosmos">Cosmos</option>' +
+                            '<option value="sanctuary">Santuario</option><option value="crystal">Cristal</option><option value="rain">Lluvia</option>' +
+                            '<option value="aurora">Aurora</option><option value="eternity">Eternidad</option></select>';
+                        var description = panel.querySelector('p');
+                        if (description && description.nextSibling) panel.insertBefore(section, description.nextSibling);
+                        else panel.insertBefore(section, panel.firstChild);
+                        document.getElementById('soundThemeSelect').addEventListener('change', function(event) {
+                            selectedTheme = event.target.value;
+                            if (audioButton.dataset.audioActive === 'true') {
+                                stopAudio();
+                                startAudio();
+                            }
+                        });
+                    }
+                }
+            })();
+        """.trimIndent()
+    }
 }
 
 class CosmosWallpaperService : WallpaperService() {
@@ -184,7 +288,6 @@ class CosmosWallpaperService : WallpaperService() {
                 framePending = false
                 val view = webView
                 if (view == null || engineDestroyed || !isVisible) return
-
                 view.invalidate()
                 var canvas: Canvas? = null
                 try {
@@ -204,7 +307,6 @@ class CosmosWallpaperService : WallpaperService() {
         override fun onCreate(surfaceHolder: SurfaceHolder?) {
             super.onCreate(surfaceHolder)
             setTouchEventsEnabled(true)
-
             try {
                 val view = WebView(this@CosmosWallpaperService)
                 webView = view
@@ -221,7 +323,6 @@ class CosmosWallpaperService : WallpaperService() {
                     useWideViewPort = true
                     loadWithOverviewMode = true
                 }
-
                 view.webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
@@ -232,18 +333,13 @@ class CosmosWallpaperService : WallpaperService() {
                                 });
                                 if(typeof resizeCanvas==='function') resizeCanvas();
                                 if(typeof toggleRhythmMode==='function' && !window.__cosmosNativeRhythmStarted){
-                                    window.__cosmosNativeRhythmStarted=true;
-                                    toggleRhythmMode();
+                                    window.__cosmosNativeRhythmStarted=true; toggleRhythmMode();
                                 }
                             })();
                         """.trimIndent()
-                        view?.post {
-                            view.evaluateJavascript(script, null)
-                            view.invalidate()
-                        }
+                        view?.post { view.evaluateJavascript(script, null); view.invalidate() }
                     }
                 }
-
                 view.webChromeClient = object : WebChromeClient() {
                     override fun onPermissionRequest(request: PermissionRequest) {
                         mainHandler.post {
@@ -259,7 +355,6 @@ class CosmosWallpaperService : WallpaperService() {
                         }
                     }
                 }
-
                 view.loadUrl("file:///android_asset/Cosmos%20Generativo.html?nativeWallpaper=1")
             } catch (exception: RuntimeException) {
                 android.util.Log.e("CosmosWallpaper", "No se pudo cargar el WebView", exception)
@@ -313,12 +408,7 @@ class CosmosWallpaperService : WallpaperService() {
             engineDestroyed = true
             mainHandler.removeCallbacks(drawFrameRunnable)
             framePending = false
-            webView?.apply {
-                stopLoading()
-                onPause()
-                removeAllViews()
-                destroy()
-            }
+            webView?.apply { stopLoading(); onPause(); removeAllViews(); destroy() }
             webView = null
             super.onDestroy()
         }
