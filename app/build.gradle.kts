@@ -11,8 +11,16 @@ android {
         applicationId = "com.cosmos.audiorhythmwallpaper"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
+    }
+
+    sourceSets {
+        getByName("main") {
+            manifest.srcFile("src/main/src/main/AndroidManifest.xml")
+            java.srcDir("src/main")
+            assets.srcDir("src/assets")
+        }
     }
 
     compileOptions {
