@@ -7,6 +7,8 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.view.MotionEvent
 import android.view.SurfaceHolder
@@ -25,7 +27,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
-
     private val requestMicPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -34,9 +35,10 @@ class MainActivity : ComponentActivity() {
         } else {
             Toast.makeText(
                 this,
-                "Se necesita el micrófono para que el fondo reaccione a la música",
+                "Sin permiso de micrófono el fondo no podrá reaccionar al audio.",
                 Toast.LENGTH_LONG
             ).show()
+            openWallpaperPicker()
         }
     }
 
@@ -49,44 +51,36 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(0xFF09090B.toInt())
         }
 
-        val title = TextView(this).apply {
+        layout.addView(TextView(this).apply {
             text = "Cosmos Audiorítmico\nFondo Vivo"
             textSize = 26f
             setTextColor(0xFFFAFAFA.toInt())
             setPadding(0, 0, 0, 24)
-        }
+        })
 
-        val subtitle = TextView(this).apply {
-            text = "Este servicio coloca tu visualización interactiva como fondo de pantalla en vivo."
+        layout.addView(TextView(this).apply {
+            text = "El permiso de micrófono permite que la animación reaccione al ritmo."
             textSize = 15f
             setTextColor(0xFFA1A1AA.toInt())
-            setPadding(0, 0, 0, 64)
-        }
+            setPadding(0, 0, 0, 48)
+        })
 
-        val applyBtn = Button(this).apply {
+        layout.addView(Button(this).apply {
             text = "Definir como Fondo de Pantalla"
-            textSize = 16f
-            setBackgroundColor(0xFF9333EA.toInt())
-            setTextColor(0xFFFFFFFF.toInt())
-            setPadding(48, 36, 48, 36)
             setOnClickListener {
                 checkMicAndLaunchWallpaper()
             }
-        }
+        })
 
-        layout.addView(title)
-        layout.addView(subtitle)
-        layout.addView(applyBtn)
         setContentView(layout)
     }
 
     private fun checkMicAndLaunchWallpaper() {
-        val hasMic = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (hasMic) {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
             openWallpaperPicker()
         } else {
             requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
@@ -94,64 +88,123 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openWallpaperPicker() {
+        val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
+            putExtra(
+                WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                ComponentName(this@MainActivity, CosmosWallpaperService::class.java)
+            )
+        }
+
         try {
-            val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
-                putExtra(
-                    WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                    ComponentName(this@MainActivity, CosmosWallpaperService::class.java)
-                )
-            }
             startActivity(intent)
-        } catch (e: Exception) {
-            startActivity(Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER))
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER))
+            } catch (_: Exception) {
+                Toast.makeText(
+                    this,
+                    "No se pudo abrir el selector de fondos",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 }
 
 class CosmosWallpaperService : WallpaperService() {
-
-    override fun onCreateEngine(): Engine {
-        return CosmosWebViewEngine()
-    }
+    override fun onCreateEngine(): Engine = CosmosWebViewEngine()
 
     inner class CosmosWebViewEngine : Engine() {
+        private val mainHandler = Handler(Looper.getMainLooper())
         private var webView: WebView? = null
+        private var frameScheduled = false
+        private var destroyed = false
+
+        private val drawFrameRunnable = object : Runnable {
+            override fun run() {
+                frameScheduled = false
+                val view = webView ?: return
+                if (destroyed || !isVisible) return
+
+                var canvas: android.graphics.Canvas? = null
+                try {
+                    canvas = surfaceHolder.lockCanvas()
+                    if (canvas != null) {
+                        view.draw(canvas)
+                    }
+                } catch (_: Exception) {
+                    // La superficie puede desaparecer al cambiar la visibilidad.
+                } finally {
+                    if (canvas != null) {
+                        try {
+                            surfaceHolder.unlockCanvasAndPost(canvas)
+                        } catch (_: Exception) {
+                            // Surface destruida durante el dibujo.
+                        }
+                    }
+                }
+
+                scheduleFrame()
+            }
+        }
 
         @SuppressLint("SetJavaScriptEnabled")
         override fun onCreate(surfaceHolder: SurfaceHolder?) {
             super.onCreate(surfaceHolder)
             setTouchEventsEnabled(true)
 
-            webView = WebView(applicationContext).apply {
-                settings.apply {
-                    javaScriptEnabled = true
-                    domStorageEnabled = true
-                    mediaPlaybackRequiresUserGesture = false
-                    allowFileAccess = true
-                    cacheMode = WebSettings.LOAD_DEFAULT
-                }
+            try {
+                webView = WebView(this@CosmosWallpaperService).apply {
+                    setBackgroundColor(android.graphics.Color.BLACK)
 
-                webChromeClient = object : WebChromeClient() {
-                    override fun onPermissionRequest(request: PermissionRequest?) {
-                        val requestsOnlyAudio = request?.resources?.all {
-                            it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
-                        } == true
+                    settings.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        mediaPlaybackRequiresUserGesture = false
+                        allowFileAccess = true
+                        allowContentAccess = false
+                        cacheMode = WebSettings.LOAD_DEFAULT
+                    }
 
-                        val hasRuntimeMicPermission = ContextCompat.checkSelfPermission(
-                            applicationContext,
-                            Manifest.permission.RECORD_AUDIO
-                        ) == PackageManager.PERMISSION_GRANTED
+                    webViewClient = WebViewClient()
 
-                        if (requestsOnlyAudio && hasRuntimeMicPermission) {
-                            request.grant(request.resources)
-                        } else {
-                            request?.deny()
+                    webChromeClient = object : WebChromeClient() {
+                        override fun onPermissionRequest(request: PermissionRequest) {
+                            mainHandler.post {
+                                val audioOnly =
+                                    request.resources.isNotEmpty() &&
+                                    request.resources.all {
+                                        it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                                    }
+
+                                val micGranted =
+                                    ContextCompat.checkSelfPermission(
+                                        this@CosmosWallpaperService,
+                                        Manifest.permission.RECORD_AUDIO
+                                    ) == PackageManager.PERMISSION_GRANTED
+
+                                if (audioOnly && micGranted && !destroyed) {
+                                    request.grant(
+                                        arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)
+                                    )
+                                } else {
+                                    request.deny()
+                                }
+                            }
+                        }
+
+                        override fun onPermissionRequestCanceled(request: PermissionRequest) {
+                            request.deny()
                         }
                     }
-                }
 
-                webViewClient = WebViewClient()
-                loadUrl("file:///android_asset/fondo-celular-audioritmico.html")
+                    loadUrl(
+                        "file:///android_asset/fondo-celular-audioritmico.html"
+                    )
+                }
+            } catch (_: RuntimeException) {
+                webView?.destroy()
+                webView = null
             }
         }
 
@@ -162,50 +215,65 @@ class CosmosWallpaperService : WallpaperService() {
             height: Int
         ) {
             super.onSurfaceChanged(holder, format, width, height)
-            webView?.let { wv ->
-                val widthSpec = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY)
-                val heightSpec = View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
-                wv.measure(widthSpec, heightSpec)
-                wv.layout(0, 0, width, height)
+            resizeWebView(width, height)
+            scheduleFrame()
+        }
+
+        private fun resizeWebView(width: Int, height: Int) {
+            if (width <= 0 || height <= 0) return
+
+            webView?.let { view ->
+                val widthSpec =
+                    View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY)
+                val heightSpec =
+                    View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
+
+                view.measure(widthSpec, heightSpec)
+                view.layout(0, 0, width, height)
             }
         }
 
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
+
             if (visible) {
                 webView?.onResume()
-                drawFrame()
+                scheduleFrame()
             } else {
+                mainHandler.removeCallbacks(drawFrameRunnable)
+                frameScheduled = false
                 webView?.onPause()
             }
         }
 
         override fun onTouchEvent(event: MotionEvent?) {
-            super.onTouchEvent(event)
             if (event != null) {
                 webView?.dispatchTouchEvent(event)
             }
+            super.onTouchEvent(event)
         }
 
-        private fun drawFrame() {
-            val holder = surfaceHolder ?: return
-            val wv = webView ?: return
-            if (!isVisible) return
-
-            try {
-                val canvas = holder.lockCanvas()
-                if (canvas != null) {
-                    wv.draw(canvas)
-                    holder.unlockCanvasAndPost(canvas)
-                }
-            } catch (_: Exception) {
+        private fun scheduleFrame() {
+            if (destroyed || !isVisible || frameScheduled || webView == null) {
+                return
             }
 
-            wv.postDelayed({ drawFrame() }, 16L)
+            frameScheduled = true
+            mainHandler.post(drawFrameRunnable)
         }
 
         override fun onDestroy() {
-            webView?.destroy()
+            destroyed = true
+            mainHandler.removeCallbacks(drawFrameRunnable)
+            frameScheduled = false
+
+            webView?.apply {
+                stopLoading()
+                onPause()
+                removeAllViews()
+                destroy()
+            }
+
             webView = null
             super.onDestroy()
         }
