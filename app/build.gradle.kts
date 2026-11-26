@@ -9,8 +9,8 @@ android {
         applicationId = "com.cosmos.audiorhythmwallpaper"
         minSdk = 29
         targetSdk = 34
-        versionCode = 12
-        versionName = "1.11"
+        versionCode = 13
+        versionName = "1.12"
     }
     sourceSets {
         getByName("main") {
