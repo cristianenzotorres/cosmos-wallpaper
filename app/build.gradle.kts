@@ -11,8 +11,8 @@ android {
         applicationId = "com.cosmos.audiorhythmwallpaper"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
     }
 
     sourceSets {
@@ -36,4 +36,5 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.activity:activity-ktx:1.8.2")
+    implementation("androidx.webkit:webkit:1.10.0")
 }
