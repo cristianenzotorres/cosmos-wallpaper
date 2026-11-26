@@ -1,0 +1,1871 @@
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmos Audiorítmico Completo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: #09090b;
+            color: #fafafa;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.15);
+            height: 6px;
+            border-radius: 999px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #a855f7;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen select-none">
+
+    <canvas id="artCanvas"></canvas>
+
+    <!-- Notificación flotante sin ventanas bloqueantes -->
+    <div id="toast" class="fixed top-5 left-1/2 transform -translate-x-1/2 bg-zinc-800/90 backdrop-blur-md text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg border border-zinc-700 opacity-0 transition-opacity duration-300 pointer-events-none z-50">
+        Mensaje
+    </div>
+
+    <!-- Botón para ocultar/mostrar panel de controles -->
+    <button id="togglePanelBtn" class="fixed top-4 right-4 z-40 bg-zinc-900/80 hover:bg-zinc-800 backdrop-blur-md text-white p-3 rounded-2xl border border-zinc-700/70 shadow-xl transition-all flex items-center gap-2 text-sm font-medium">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="hidden sm:inline">Controles</span>
+    </button>
+
+    <!-- Panel completo de personalización visual, sonora y audiorítmica -->
+    <div id="controlPanel" class="fixed top-16 right-4 w-72 sm:w-80 bg-zinc-900/85 backdrop-blur-xl border border-zinc-700/70 rounded-3xl p-5 shadow-2xl z-30 transition-all duration-300 flex flex-col gap-4 max-h-[85vh] overflow-y-auto">
+        <div class="flex items-start justify-between gap-2">
+            <div>
+                <h1 class="text-base font-bold text-white tracking-tight">Cosmos Generativo</h1>
+                <p class="text-xs text-zinc-400">Desliza para crear luz y un canto trémolo infinito.</p>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+                <button id="rhythmToggleBtn" class="p-2.5 rounded-2xl bg-zinc-800/90 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 transition-all flex items-center gap-1" title="Modo Audiorítmico">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 9v5"/></svg>
+                </button>
+                <button id="audioToggleBtn" class="p-2.5 rounded-2xl bg-zinc-800/90 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 transition-all flex items-center gap-1.5" title="Activar Audio">
+                    <svg id="audioIconOff" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                    <svg id="audioIconOn" class="hidden text-purple-400 animate-pulse" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Medidor de frecuencias y selector de los 10 estilos musicales -->
+        <div id="rhythmMeterBox" class="hidden space-y-2 bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800">
+            <div class="flex justify-between items-center text-[11px] text-zinc-400">
+                <span>Tempo / Base / Voz</span>
+                <div class="flex items-center gap-1.5">
+                    <span id="tempoBadge" class="px-2 py-0.5 rounded-full bg-fuchsia-950/80 border border-fuchsia-500/40 text-fuchsia-300 font-mono text-[10px]">-- BPM</span>
+                    <span id="beatStatus" class="text-zinc-300 font-medium">Escuchando...</span>
+                </div>
+            </div>
+            <div class="space-y-1.5">
+                <div>
+                    <div class="flex justify-between text-[9px] text-zinc-400 mb-0.5">
+                        <span>Bombo / Sub-Grave (25–110 Hz)</span>
+                        <span id="bassPct" class="text-purple-400 font-mono">0%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div id="bassBar" class="h-full bg-gradient-to-r from-purple-600 to-fuchsia-500 transition-all duration-75" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-[9px] text-zinc-400 mb-0.5">
+                        <span>Bajo / Instrumentos Graves (110–320 Hz)</span>
+                        <span id="lowMidPct" class="text-indigo-300 font-mono">0%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div id="lowMidBar" class="h-full bg-gradient-to-r from-indigo-500 to-purple-400 transition-all duration-75" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-[9px] text-zinc-400 mb-0.5">
+                        <span>Voz Cantada / Melodía (320–2,800 Hz)</span>
+                        <span id="vocalPct" class="text-amber-300 font-mono">0%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div id="vocalBar" class="h-full bg-gradient-to-r from-amber-400 via-rose-400 to-white transition-all duration-75" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-[9px] text-zinc-400 mb-0.5">
+                        <span>Platillos / Agudos Rítmicos (6.5–16 kHz)</span>
+                        <span id="treblePct" class="text-cyan-300 font-mono">0%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div id="trebleBar" class="h-full bg-gradient-to-r from-cyan-400 to-white transition-all duration-75" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="pt-1">
+                <div class="flex justify-between text-[10px] text-zinc-400 mb-0.5">
+                    <span>Sensibilidad (Preamplificador)</span>
+                    <span id="rhythmGainVal" class="text-fuchsia-400 font-mono">2.5x</span>
+                </div>
+                <input type="range" id="rhythmGain" min="0.5" max="8.0" step="0.1" value="2.5" class="w-full">
+            </div>
+            <div class="pt-1 border-t border-zinc-800/80">
+                <label class="block text-[10px] font-medium text-zinc-300 mb-1">Arquitectura Visual de Música (10 Estilos)</label>
+                <div class="grid grid-cols-2 gap-1">
+                    <button data-viz="radar" class="viz-btn py-1 px-1.5 text-[10px] font-medium rounded-lg bg-fuchsia-950/80 border border-fuchsia-500/60 text-white">1. Radar Circular</button>
+                    <button data-viz="bars" class="viz-btn py-1 px-1.5 text-[10px] font-medium rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white">2. Barras Espejo</button>
+                    <button data-viz="terrain" class="viz-btn py-1 px-1.5 text-[10px] font-medium rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white">3. Montañas 3D</button>
+                    <button data-viz="strings" class="viz-btn py-1 px-1.5 text-[10px] font-medium rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white">4. Cuerdas Arpa</button>
+                    <button data-viz="tunnel" class="viz-btn py-1 px-1.5 text-[10px] font-medium rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white">5. Túnel 3D</button>
+                    <button data-viz="dna" class="viz-btn py-1 px-1.5 text-[10px] font-medium rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white">6. Doble Hélice</button>
+                    <button data-viz="matrix" class="viz-btn py-1 px-1.5 text-[10px] font-medium rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white">7. Matriz LED</button>
+                    <button data-viz="scope" class="viz-btn py-1 px-1.5 text-[10px] font-medium rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white">8. Osciloscopio</button>
+                    <button data-viz="horizon" class="viz-btn py-1 px-1.5 text-[10px] font-medium rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white">9. Olas Líquidas</button>
+                    <button data-viz="bloom" class="viz-btn py-1 px-1.5 text-[10px] font-medium rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white">10. Flor Polar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paletas de color -->
+        <div class="space-y-1.5">
+            <label class="text-xs font-medium text-zinc-300">Paleta de Color</label>
+            <div class="grid grid-cols-3 gap-1.5">
+                <button data-palette="neon" class="palette-btn py-1.5 px-2 rounded-xl text-xs font-medium bg-zinc-800 border-2 border-purple-500 text-white transition-all">Neón</button>
+                <button data-palette="sunset" class="palette-btn py-1.5 px-2 rounded-xl text-xs font-medium bg-zinc-800 border-2 border-transparent text-zinc-300 hover:text-white transition-all">Ocaso</button>
+                <button data-palette="ocean" class="palette-btn py-1.5 px-2 rounded-xl text-xs font-medium bg-zinc-800 border-2 border-transparent text-zinc-300 hover:text-white transition-all">Abisal</button>
+                <button data-palette="gold" class="palette-btn py-1.5 px-2 rounded-xl text-xs font-medium bg-zinc-800 border-2 border-transparent text-zinc-300 hover:text-white transition-all">Dorado</button>
+                <button data-palette="aurora" class="palette-btn py-1.5 px-2 rounded-xl text-xs font-medium bg-zinc-800 border-2 border-transparent text-zinc-300 hover:text-white transition-all">Aurora</button>
+                <button data-palette="celestial" class="palette-btn py-1.5 px-2 rounded-xl text-xs font-medium bg-zinc-800 border-2 border-transparent text-zinc-300 hover:text-white transition-all">Celestial</button>
+            </div>
+        </div>
+
+        <!-- 16 diseños artísticos de partículas -->
+        <div class="space-y-1.5">
+            <label class="text-xs font-medium text-zinc-300">Diseño / Estilo Artístico</label>
+            <div class="grid grid-cols-4 gap-1 bg-zinc-950/60 p-1 rounded-xl border border-zinc-800">
+                <button data-mode="silk" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg bg-zinc-800 text-white shadow">Seda</button>
+                <button data-mode="constellation" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Red</button>
+                <button data-mode="orbs" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Orbes</button>
+                <button data-mode="vortex" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Espiral</button>
+                <button data-mode="sacred" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Geometría</button>
+                <button data-mode="aura" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Aura</button>
+                <button data-mode="nebula" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Nebulosa</button>
+                <button data-mode="mandala" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Mandala</button>
+                <button data-mode="prism" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Prisma</button>
+                <button data-mode="lotus" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Loto</button>
+                <button data-mode="pulse" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Pulso</button>
+                <button data-mode="supernova" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Nova</button>
+                <button data-mode="ripples" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Ondas</button>
+                <button data-mode="galaxy" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Galaxia</button>
+                <button data-mode="crystal" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Cristal</button>
+                <button data-mode="flame" class="mode-btn py-1.5 text-[11px] font-medium rounded-lg text-zinc-400 hover:text-white">Fuego</button>
+            </div>
+        </div>
+
+        <!-- 8 atmósferas sonoras Theremin -->
+        <div class="space-y-1.5">
+            <label class="text-xs font-medium text-zinc-300">Atmósfera Sonora (Theremin)</label>
+            <div class="grid grid-cols-2 gap-1.5 bg-zinc-950/60 p-1 rounded-xl border border-zinc-800">
+                <button data-sound="angels" class="sound-btn py-1.5 text-xs font-medium rounded-lg bg-zinc-800 text-white shadow">Ángeles</button>
+                <button data-sound="soul" class="sound-btn py-1.5 text-xs font-medium rounded-lg text-zinc-400 hover:text-white">Alma</button>
+                <button data-sound="cosmos" class="sound-btn py-1.5 text-xs font-medium rounded-lg text-zinc-400 hover:text-white">Cosmos</button>
+                <button data-sound="sanctuary" class="sound-btn py-1.5 text-xs font-medium rounded-lg text-zinc-400 hover:text-white">Santuario</button>
+                <button data-sound="crystal" class="sound-btn py-1.5 text-xs font-medium rounded-lg text-zinc-400 hover:text-white">Cristal</button>
+                <button data-sound="rain" class="sound-btn py-1.5 text-xs font-medium rounded-lg text-zinc-400 hover:text-white">Lluvia</button>
+                <button data-sound="aurora" class="sound-btn py-1.5 text-xs font-medium rounded-lg text-zinc-400 hover:text-white">Aurora</button>
+                <button data-sound="eternity" class="sound-btn py-1.5 text-xs font-medium rounded-lg text-zinc-400 hover:text-white">Eternidad</button>
+            </div>
+        </div>
+
+        <!-- Ajustes finos del sistema de partículas -->
+        <div class="space-y-3">
+            <div>
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-zinc-300">Cantidad de Partículas</span>
+                    <span id="countVal" class="text-purple-400 font-mono">120</span>
+                </div>
+                <input type="range" id="particleCount" min="30" max="300" value="120" class="w-full">
+            </div>
+
+            <div>
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-zinc-300">Grosor / Escala</span>
+                    <span id="sizeVal" class="text-purple-400 font-mono">1.0x</span>
+                </div>
+                <input type="range" id="brushScale" min="0.3" max="3.0" step="0.1" value="1.0" class="w-full">
+            </div>
+
+            <div>
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-zinc-300">Estela (Persistencia)</span>
+                    <span id="trailVal" class="text-purple-400 font-mono">92%</span>
+                </div>
+                <input type="range" id="trailLength" min="50" max="99" value="92" class="w-full">
+            </div>
+
+            <div>
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-zinc-300">Fuerza de Interacción</span>
+                    <span id="forceVal" class="text-purple-400 font-mono">5</span>
+                </div>
+                <input type="range" id="interactionForce" min="-10" max="15" value="5" class="w-full">
+            </div>
+
+            <div>
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-zinc-300">Simetría Caleidoscopio</span>
+                    <span id="symmetryVal" class="text-purple-400 font-mono">1x</span>
+                </div>
+                <input type="range" id="symmetry" min="1" max="8" value="1" class="w-full">
+            </div>
+        </div>
+
+        <!-- Acciones rápidas de lienzo -->
+        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800">
+            <button id="clearBtn" class="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl text-xs font-medium transition-colors flex items-center justify-center gap-1.5">
+                Limpiar
+            </button>
+            <button id="pauseBtn" class="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl text-xs font-medium transition-colors flex items-center justify-center gap-1.5">
+                <span id="pauseText">Pausar</span>
+            </button>
+        </div>
+
+        <button id="saveBtn" class="w-full py-2.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-purple-900/30 transition-all flex items-center justify-center gap-2">
+            Descargar Obra (PNG)
+        </button>
+
+        <div class="grid grid-cols-2 gap-2">
+            <button id="wallpaperModeBtn" class="py-2.5 px-3 bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-fuchsia-900/30 transition-all flex items-center justify-center gap-1.5">
+                <span>Fondo Vivo</span>
+            </button>
+            <button id="installWallpaperBtn" class="py-2.5 px-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-1.5">
+                <span>Guía Fondo</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Botón discreto para salir del Modo Fondo Vivo -->
+    <button id="exitWallpaperBtn" class="hidden fixed bottom-5 right-5 z-50 bg-zinc-900/40 hover:bg-zinc-900/85 backdrop-blur-md text-zinc-300 hover:text-white px-3.5 py-2 rounded-full text-xs font-medium border border-white/10 transition-all opacity-30 hover:opacity-100">
+        Salir de Fondo
+    </button>
+
+    <!-- Ventana modal informativa para configurar fondo en pantalla -->
+    <div id="wallpaperModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-700 rounded-3xl max-w-md w-full p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 class="text-base font-bold text-white">Fondo Vivo Interactivo</h2>
+                <button id="closeWallpaperModal" class="text-zinc-400 hover:text-white p-1 rounded-lg">✕</button>
+            </div>
+            <p class="text-xs text-zinc-300 leading-relaxed">
+                Puedes activar <strong>Fondo Vivo</strong> para ocultar controles y mantener la pantalla activa mientras tocas o escuchas música, o usar tu app nativa <strong>Cosmos Audiorítmico</strong> para fijarlo detrás de los íconos del escritorio.
+            </p>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+                <button id="launchFullscreenWallpaperBtn" class="w-full col-span-2 py-2.5 px-3 bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white rounded-xl text-xs font-semibold transition-all">
+                    Activar Vista Limpia (Fondo Vivo)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('artCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Ajusta el tamaño del lienzo de forma fluida a cualquier pantalla
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            ctx.fillStyle = '#09090b';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const state = {
+            particles: [],
+            count: 120,
+            brushScale: 1.0,
+            trailAlpha: 0.08,
+            force: 5,
+            symmetry: 1,
+            mode: 'silk',
+            vizStyle: 'radar',
+            soundTheme: 'angels',
+            palette: 'neon',
+            isPaused: false,
+            audioEnabled: false,
+            isLeadPlaying: false,
+            currentLeadFreq: 440,
+            rhythmEnabled: false,
+            rhythmSimulated: false,
+            rhythmGain: 2.5,
+            bassEnergy: 0,
+            lowMidEnergy: 0,
+            vocalEnergy: 0,
+            instrumentEnergy: 0,
+            trebleEnergy: 0,
+            beatEnergy: 0,
+            hihatImpact: 0,
+            lastBeatTime: 0,
+            lastHihatTime: 0,
+            bpmEstimate: 0,
+            beatCount: 0,
+            bassHistory: [],
+            trebleHistory: [],
+            beatIntervals: [],
+            vocalRibbonPhase: 0,
+            vocalWave: new Uint8Array(256),
+            spectrum: new Uint8Array(72),
+            spectrumHistory: [],
+            shockwaves: [],
+            beatRings: [],
+            hihatFlashes: [],
+            vocalSparks: [],
+            pointers: []
+        };
+
+        const palettes = {
+            neon: ['#a855f7', '#ec4899', '#3b82f6', '#10b981', '#8b5cf6'],
+            sunset: ['#f97316', '#ef4444', '#eab308', '#db2777', '#f59e0b'],
+            ocean: ['#06b6d4', '#3b82f6', '#0284c7', '#2dd4bf', '#6366f1'],
+            gold: ['#fbbf24', '#d97706', '#fef08a', '#b45309', '#f59e0b'],
+            aurora: ['#34d399', '#2dd4bf', '#818cf8', '#c084fc', '#a7f3d0'],
+            celestial: ['#f8fafc', '#e2e8f0', '#bae6fd', '#ddd6fe', '#fef08a']
+        };
+
+        // --- MOTOR DE AUDIO GENERATIVO CON TONOS TRÉMOLO CONTINUOS ---
+        let leadOscA = null;
+        let leadOscB = null;
+        let vibratoLFO = null;
+        let tremoloEffect = null;
+        let filterNode = null;
+        let leadGain = null;
+        let padSynth = null;
+        let reverb = null;
+        let delay = null;
+        let padLoop = null;
+        let isAudioInitialized = false;
+
+        // --- ANALIZADOR DE AUDIO EN TIEMPO REAL ---
+        let rhythmAudioCtx = null;
+        let rhythmAnalyser = null;
+        let vocalFilterNode = null;
+        let vocalAnalyserNode = null;
+        let rhythmPreAmp = null;
+        let rhythmStream = null;
+        let rhythmDataArray = null;
+
+        async function toggleRhythmMode() {
+            const btn = document.getElementById('rhythmToggleBtn');
+            const meterBox = document.getElementById('rhythmMeterBox');
+
+            if (state.rhythmEnabled) {
+                state.rhythmEnabled = false;
+                state.rhythmSimulated = false;
+                state.bassEnergy = 0;
+                state.lowMidEnergy = 0;
+                state.vocalEnergy = 0;
+                state.instrumentEnergy = 0;
+                state.trebleEnergy = 0;
+                state.beatEnergy = 0;
+                state.hihatImpact = 0;
+                state.bpmEstimate = 0;
+                state.beatCount = 0;
+                state.bassHistory = [];
+                state.trebleHistory = [];
+                state.beatIntervals = [];
+                state.shockwaves = [];
+                state.beatRings = [];
+                state.hihatFlashes = [];
+                state.vocalSparks = [];
+
+                if (rhythmStream) {
+                    rhythmStream.getTracks().forEach(t => t.stop());
+                    rhythmStream = null;
+                }
+                if (rhythmAudioCtx) {
+                    try { await rhythmAudioCtx.close(); } catch (e) {}
+                    rhythmAudioCtx = null;
+                    rhythmAnalyser = null;
+                    vocalFilterNode = null;
+                    vocalAnalyserNode = null;
+                    rhythmPreAmp = null;
+                }
+                btn.classList.remove('border-fuchsia-500', 'bg-fuchsia-950/60', 'text-fuchsia-300');
+                btn.classList.add('border-zinc-700', 'bg-zinc-800/90', 'text-zinc-300');
+                meterBox.classList.add('hidden');
+                showToast('Modo audiorítmico desactivado');
+                return;
+            }
+
+            try {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('Micrófono no disponible en este entorno');
+                }
+                rhythmStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    }
+                });
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                rhythmAudioCtx = new AudioCtx();
+                if (rhythmAudioCtx.state === 'suspended') {
+                    await rhythmAudioCtx.resume();
+                }
+
+                const source = rhythmAudioCtx.createMediaStreamSource(rhythmStream);
+                rhythmPreAmp = rhythmAudioCtx.createGain();
+                rhythmPreAmp.gain.value = state.rhythmGain;
+
+                rhythmAnalyser = rhythmAudioCtx.createAnalyser();
+                rhythmAnalyser.fftSize = 2048;
+                rhythmAnalyser.smoothingTimeConstant = 0.65;
+                rhythmAnalyser.minDecibels = -88;
+                rhythmAnalyser.maxDecibels = -15;
+
+                vocalFilterNode = rhythmAudioCtx.createBiquadFilter();
+                vocalFilterNode.type = 'bandpass';
+                vocalFilterNode.frequency.value = 1150;
+                vocalFilterNode.Q.value = 0.75;
+
+                vocalAnalyserNode = rhythmAudioCtx.createAnalyser();
+                vocalAnalyserNode.fftSize = 1024;
+                vocalAnalyserNode.smoothingTimeConstant = 0.6;
+                vocalAnalyserNode.minDecibels = -85;
+                vocalAnalyserNode.maxDecibels = -18;
+
+                source.connect(rhythmPreAmp);
+                rhythmPreAmp.connect(rhythmAnalyser);
+                rhythmPreAmp.connect(vocalFilterNode);
+                vocalFilterNode.connect(vocalAnalyserNode);
+
+                rhythmDataArray = new Uint8Array(rhythmAnalyser.frequencyBinCount);
+                state.vocalWave = new Uint8Array(256);
+
+                state.rhythmEnabled = true;
+                state.rhythmSimulated = false;
+                btn.classList.remove('border-zinc-700', 'bg-zinc-800/90', 'text-zinc-300');
+                btn.classList.add('border-fuchsia-500', 'bg-fuchsia-950/60', 'text-fuchsia-300');
+                meterBox.classList.remove('hidden');
+                showToast('Escuchando ritmo, platillos, base y voz en vivo');
+            } catch (err) {
+                state.rhythmEnabled = true;
+                state.rhythmSimulated = true;
+                btn.classList.remove('border-zinc-700', 'bg-zinc-800/90', 'text-zinc-300');
+                btn.classList.add('border-fuchsia-500', 'bg-fuchsia-950/60', 'text-fuchsia-300');
+                meterBox.classList.remove('hidden');
+                showToast('Modo ritmo demo activo (permite micrófono para música real)');
+            }
+        }
+
+        function updateAudioReactivity() {
+            if (!state.rhythmEnabled) return;
+
+            const bassBar = document.getElementById('bassBar');
+            const bassPct = document.getElementById('bassPct');
+            const lowMidBar = document.getElementById('lowMidBar');
+            const lowMidPct = document.getElementById('lowMidPct');
+            const vocalBar = document.getElementById('vocalBar');
+            const vocalPct = document.getElementById('vocalPct');
+            const trebleBar = document.getElementById('trebleBar');
+            const treblePct = document.getElementById('treblePct');
+            const beatStatus = document.getElementById('beatStatus');
+            const tempoBadge = document.getElementById('tempoBadge');
+
+            if (!state.rhythmSimulated && rhythmAnalyser && rhythmDataArray && vocalAnalyserNode) {
+                rhythmAnalyser.getByteFrequencyData(rhythmDataArray);
+                const vocalData = new Uint8Array(vocalAnalyserNode.frequencyBinCount);
+                vocalAnalyserNode.getByteFrequencyData(vocalData);
+
+                const waveTemp = new Uint8Array(vocalAnalyserNode.fftSize);
+                vocalAnalyserNode.getByteTimeDomainData(waveTemp);
+                const step = Math.max(1, Math.floor(waveTemp.length / state.vocalWave.length));
+                for (let w = 0; w < state.vocalWave.length; w++) {
+                    state.vocalWave[w] = waveTemp[w * step] || 128;
+                }
+
+                const nyquist = (rhythmAudioCtx ? rhythmAudioCtx.sampleRate : 48000) / 2;
+                const binHz = nyquist / rhythmDataArray.length;
+
+                const getBandEnergy = (arr, lowHz, highHz, peakWeight = 0.65) => {
+                    const start = Math.max(1, Math.floor(lowHz / binHz));
+                    const end = Math.min(arr.length - 1, Math.max(start + 1, Math.floor(highHz / binHz)));
+                    let sum = 0;
+                    let peak = 0;
+                    for (let i = start; i <= end; i++) {
+                        const v = arr[i] / 255;
+                        sum += v;
+                        if (v > peak) peak = v;
+                    }
+                    const avg = sum / Math.max(1, end - start + 1);
+                    return Math.min(1, avg * (1 - peakWeight) + peak * peakWeight);
+                };
+
+                const rawBass = getBandEnergy(rhythmDataArray, 25, 110, 0.72);
+                const rawLowMid = getBandEnergy(rhythmDataArray, 110, 320, 0.62);
+                const rawVocal = getBandEnergy(vocalData, 320, 2800, 0.68);
+                const rawInstrument = getBandEnergy(rhythmDataArray, 2800, 6500, 0.60);
+                const rawTreble = getBandEnergy(rhythmDataArray, 6500, 16000, 0.80);
+
+                const minBin = Math.max(1, Math.floor(30 / binHz));
+                const maxBin = Math.min(rhythmDataArray.length - 1, Math.floor(15000 / binHz));
+                for (let s = 0; s < 72; s++) {
+                    const ratio = s / 72;
+                    const idx = Math.min(maxBin, Math.floor(minBin + Math.pow(ratio, 1.75) * (maxBin - minBin)));
+                    const prevVal = state.spectrum[s] || 0;
+                    state.spectrum[s] = Math.max(rhythmDataArray[idx], prevVal * 0.72);
+                }
+
+                const prevBass = state.bassEnergy;
+                const prevVocal = state.vocalEnergy;
+                const prevTreble = state.trebleEnergy;
+
+                state.bassEnergy = state.bassEnergy * 0.35 + rawBass * 0.65;
+                state.lowMidEnergy = state.lowMidEnergy * 0.42 + rawLowMid * 0.58;
+                state.vocalEnergy = state.vocalEnergy * 0.36 + rawVocal * 0.64;
+                state.instrumentEnergy = state.instrumentEnergy * 0.40 + rawInstrument * 0.60;
+                state.trebleEnergy = state.trebleEnergy * 0.25 + rawTreble * 0.75;
+
+                state.bassHistory.push(rawBass);
+                if (state.bassHistory.length > 16) state.bassHistory.shift();
+                const avgBass = state.bassHistory.reduce((a, b) => a + b, 0) / state.bassHistory.length;
+                const dynamicThreshold = Math.max(0.14, avgBass * 1.12);
+
+                state.trebleHistory.push(rawTreble);
+                if (state.trebleHistory.length > 18) state.trebleHistory.shift();
+                const avgTreble = state.trebleHistory.reduce((a, b) => a + b, 0) / state.trebleHistory.length;
+                const trebleThreshold = Math.max(0.11, avgTreble * 1.10);
+
+                const now = performance.now();
+                const bassRise = rawBass - prevBass;
+                const isBassBeat = (rawBass > dynamicThreshold && bassRise > 0.025 && (now - state.lastBeatTime) > 130)
+                    || (bassRise > 0.075 && rawBass > 0.16 && (now - state.lastBeatTime) > 120);
+                const isHihatBeat = rawTreble > trebleThreshold && (rawTreble - prevTreble) > 0.02 && (now - state.lastHihatTime) > 85;
+
+                if (isHihatBeat) {
+                    state.lastHihatTime = now;
+                    state.hihatImpact = 1.0;
+                    const colors = palettes[state.palette] || palettes.neon;
+                    const rayCount = 12 + Math.floor(rawTreble * 12);
+                    const baseAngle = Math.random() * Math.PI * 2;
+                    const dialEdge = Math.min(canvas.width, canvas.height) * 0.15;
+                    for (let r = 0; r < rayCount; r++) {
+                        if (state.hihatFlashes.length < 64) {
+                            const angle = baseAngle + (r * Math.PI * 2) / rayCount;
+                            state.hihatFlashes.push({
+                                angle,
+                                innerRadius: dialEdge + 6,
+                                length: 35 + rawTreble * 95,
+                                alpha: 1.0,
+                                color: r % 2 === 0 ? '#ffffff' : (colors[3] || colors[2] || '#38bdf8')
+                            });
+                        }
+                    }
+                }
+                state.hihatImpact *= 0.80;
+
+                if (isBassBeat) {
+                    const hitStrength = rawBass;
+                    const interval = state.lastBeatTime > 0 ? (now - state.lastBeatTime) : 500;
+                    const isDoubleKick = interval >= 120 && interval < 260;
+
+                    if (state.lastBeatTime > 0 && interval >= 260 && interval <= 1600) {
+                        state.beatIntervals.push(interval);
+                        if (state.beatIntervals.length > 10) state.beatIntervals.shift();
+                        const sorted = [...state.beatIntervals].sort((a, b) => a - b);
+                        const medianInterval = sorted[Math.floor(sorted.length / 2)];
+                        let bpm = 60000 / medianInterval;
+                        while (bpm < 72) bpm *= 2;
+                        while (bpm > 175) bpm /= 2;
+                        state.bpmEstimate = Math.round(bpm);
+                    }
+                    state.lastBeatTime = now;
+                    if (!isDoubleKick) {
+                        state.beatCount = (state.beatCount + 1) % 4;
+                    }
+                    state.beatEnergy = 1.0;
+
+                    const colors = palettes[state.palette] || palettes.neon;
+                    if (state.shockwaves.length < 20) {
+                        state.shockwaves.push({
+                            radius: Math.min(canvas.width, canvas.height) * 0.145,
+                            maxRadius: Math.max(canvas.width, canvas.height) * 0.72,
+                            alpha: 0.95,
+                            color: isDoubleKick ? (colors[2] || colors[1] || '#ffffff') : (state.beatCount === 0 ? (colors[1] || '#ffffff') : colors[0]),
+                            lineWidth: isDoubleKick ? (2.2 + hitStrength * 2.0) : (state.beatCount === 0 ? (4.0 + hitStrength * 3.0) : (2.6 + hitStrength * 2.5))
+                        });
+                    }
+                }
+                state.beatEnergy *= 0.85;
+
+                if (rawVocal > 0.28 && rawVocal - prevVocal > 0.025) {
+                    const colors = palettes[state.palette] || palettes.neon;
+                    const sparkCount = Math.min(3, Math.ceil(rawVocal * 3));
+                    for (let k = 0; k < sparkCount; k++) {
+                        if (state.vocalSparks.length < 24) {
+                            const angle = Math.random() * Math.PI * 2;
+                            const dist = Math.min(canvas.width, canvas.height) * (0.16 + Math.random() * 0.14);
+                            state.vocalSparks.push({
+                                x: canvas.width / 2 + Math.cos(angle) * dist,
+                                y: canvas.height / 2 + Math.sin(angle) * dist,
+                                vx: Math.cos(angle) * (1.5 + rawVocal * 2.5),
+                                vy: Math.sin(angle) * (1.5 + rawVocal * 2.5) - 0.5,
+                                size: 1.8 + rawVocal * 3.0,
+                                alpha: 0.85,
+                                color: k % 2 === 0 ? (colors[3] || '#fef08a') : (colors[1] || '#fb7185')
+                            });
+                        }
+                    }
+                }
+            } else {
+                const t = performance.now() * 0.001;
+                const beatPhase = (t * 2.0) % 1;
+                const hihatPhase = (t * 4.0) % 1;
+                const bassPulse = Math.pow(Math.max(0, 1 - beatPhase * 3.5), 2);
+                const hihatPulse = Math.pow(Math.max(0, 1 - hihatPhase * 5.0), 2);
+                const vocalWaveVal = (Math.sin(t * 2.4) * 0.5 + 0.5) * (Math.sin(t * 6.5) * 0.3 + 0.7);
+                state.bassEnergy = bassPulse * 0.82;
+                state.lowMidEnergy = (Math.sin(t * 4.0) * 0.5 + 0.5) * 0.65;
+                state.vocalEnergy = vocalWaveVal * 0.72;
+                state.instrumentEnergy = (Math.cos(t * 3.2) * 0.5 + 0.5) * 0.6;
+                state.trebleEnergy = hihatPulse * 0.78;
+                state.bpmEstimate = 120;
+
+                for (let w = 0; w < state.vocalWave.length; w++) {
+                    const waveVal = Math.sin(w * 0.16 + t * 10) * 32 * state.vocalEnergy + Math.sin(w * 0.35 - t * 15) * 16 * state.vocalEnergy;
+                    state.vocalWave[w] = Math.max(0, Math.min(255, 128 + waveVal));
+                }
+
+                for (let s = 0; s < 72; s++) {
+                    const bandWave = s < 18 ? bassPulse : (s < 36 ? state.lowMidEnergy : (s < 54 ? vocalWaveVal : hihatPulse));
+                    state.spectrum[s] = Math.min(255, Math.floor((0.25 + Math.sin(t * 6 + s * 0.35) * 0.35 + bandWave * 0.6) * 220));
+                }
+
+                const now = performance.now();
+                if (hihatPulse > 0.75 && (now - state.lastHihatTime) > 220) {
+                    state.lastHihatTime = now;
+                    state.hihatImpact = 1.0;
+                    const colors = palettes[state.palette] || palettes.neon;
+                    const dialEdge = Math.min(canvas.width, canvas.height) * 0.15;
+                    for (let r = 0; r < 12; r++) {
+                        state.hihatFlashes.push({
+                            angle: (r * Math.PI * 2) / 12 + t,
+                            innerRadius: dialEdge + 6,
+                            length: 55,
+                            alpha: 1.0,
+                            color: r % 2 === 0 ? '#ffffff' : (colors[3] || '#38bdf8')
+                        });
+                    }
+                }
+                state.hihatImpact *= 0.80;
+
+                if (bassPulse > 0.85 && (now - state.lastBeatTime) > 450) {
+                    state.lastBeatTime = now;
+                    state.beatCount = (state.beatCount + 1) % 4;
+                    state.beatEnergy = 1.0;
+                    const colors = palettes[state.palette] || palettes.neon;
+                    state.shockwaves.push({
+                        radius: Math.min(canvas.width, canvas.height) * 0.145,
+                        maxRadius: Math.max(canvas.width, canvas.height) * 0.72,
+                        alpha: 0.9,
+                        color: state.beatCount === 0 ? (colors[1] || '#ffffff') : colors[0],
+                        lineWidth: state.beatCount === 0 ? 4.0 : 2.5
+                    });
+                }
+                state.beatEnergy *= 0.85;
+            }
+
+            state.vocalRibbonPhase += 0.08 + state.vocalEnergy * 0.18;
+            state.spectrumHistory.unshift(new Uint8Array(state.spectrum));
+            if (state.spectrumHistory.length > 18) state.spectrumHistory.pop();
+
+            const bassPctVal = Math.round(state.bassEnergy * 100);
+            const lowMidPctVal = Math.round(state.lowMidEnergy * 100);
+            const vocalPctVal = Math.round(state.vocalEnergy * 100);
+            const treblePctVal = Math.round(state.trebleEnergy * 100);
+            if (bassBar) bassBar.style.width = `${bassPctVal}%`;
+            if (bassPct) bassPct.textContent = `${bassPctVal}%`;
+            if (lowMidBar) lowMidBar.style.width = `${lowMidPctVal}%`;
+            if (lowMidPct) lowMidPct.textContent = `${lowMidPctVal}%`;
+            if (vocalBar) vocalBar.style.width = `${vocalPctVal}%`;
+            if (vocalPct) vocalPct.textContent = `${vocalPctVal}%`;
+            if (trebleBar) trebleBar.style.width = `${treblePctVal}%`;
+            if (treblePct) treblePct.textContent = `${treblePctVal}%`;
+            if (tempoBadge) {
+                tempoBadge.textContent = state.bpmEstimate > 0 ? `${state.bpmEstimate} BPM` : '-- BPM';
+            }
+            if (beatStatus) {
+                if (state.beatEnergy > 0.65) {
+                    beatStatus.textContent = `Bombo • ${state.beatCount + 1}/4`;
+                    beatStatus.className = 'text-fuchsia-300 font-bold';
+                } else if (treblePctVal > 35) {
+                    beatStatus.textContent = 'Platillos';
+                    beatStatus.className = 'text-cyan-300 font-semibold';
+                } else if (vocalPctVal > 30) {
+                    beatStatus.textContent = 'Voz cantada';
+                    beatStatus.className = 'text-amber-300 font-semibold';
+                } else if (lowMidPctVal > 30) {
+                    beatStatus.textContent = 'Bajo / Acordes';
+                    beatStatus.className = 'text-indigo-300 font-semibold';
+                } else {
+                    beatStatus.textContent = state.rhythmSimulated ? 'Demo ritmo' : 'Escuchando...';
+                    beatStatus.className = 'text-zinc-400 font-medium';
+                }
+            }
+        }
+
+        const scaleFrequencies = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00, 1046.50];
+
+        const soundProfiles = {
+            angels: {
+                oscAType: 'sine', oscBType: 'triangle',
+                tremoloFreq: 5.5, tremoloDepth: 0.45,
+                vibratoFreq: 5.2, vibratoDepth: 12,
+                filterCutoff: 1400, delayWet: 0.4,
+                chordPool: [['C3', 'G3', 'E4', 'B4'], ['F3', 'C4', 'A4', 'E5'], ['A2', 'E3', 'C4', 'G4'], ['G2', 'D3', 'B3', 'F#4']],
+                padWaveform: 'sine'
+            },
+            soul: {
+                oscAType: 'triangle', oscBType: 'sine',
+                tremoloFreq: 3.2, tremoloDepth: 0.55,
+                vibratoFreq: 4.5, vibratoDepth: 16,
+                filterCutoff: 950, delayWet: 0.35,
+                chordPool: [['D3', 'A3', 'F4', 'C5'], ['Bb2', 'F3', 'D4', 'A4'], ['G2', 'D3', 'Bb3', 'F4'], ['A2', 'E3', 'C#4', 'G4']],
+                padWaveform: 'triangle'
+            },
+            cosmos: {
+                oscAType: 'sine', oscBType: 'sine',
+                tremoloFreq: 7.2, tremoloDepth: 0.65,
+                vibratoFreq: 6.0, vibratoDepth: 20,
+                filterCutoff: 2200, delayWet: 0.55,
+                chordPool: [['C2', 'G2', 'D3', 'A3', 'E4'], ['Ab2', 'Eb3', 'Bb3', 'F4'], ['F2', 'C3', 'G3', 'D4'], ['Eb2', 'Bb2', 'F3', 'C4']],
+                padWaveform: 'sine'
+            },
+            sanctuary: {
+                oscAType: 'sine', oscBType: 'triangle',
+                tremoloFreq: 2.2, tremoloDepth: 0.35,
+                vibratoFreq: 3.8, vibratoDepth: 8,
+                filterCutoff: 1100, delayWet: 0.5,
+                chordPool: [['E3', 'B3', 'G#4', 'D#5'], ['A2', 'E3', 'C#4', 'G#4'], ['F#2', 'C#3', 'A3', 'E4'], ['B2', 'F#3', 'D#4', 'A4']],
+                padWaveform: 'sine'
+            },
+            crystal: {
+                oscAType: 'triangle', oscBType: 'sine',
+                tremoloFreq: 8.5, tremoloDepth: 0.5,
+                vibratoFreq: 6.8, vibratoDepth: 10,
+                filterCutoff: 3200, delayWet: 0.45,
+                chordPool: [['G3', 'D4', 'B4', 'F#5'], ['E3', 'B3', 'G4', 'D5'], ['C3', 'G3', 'E4', 'B4'], ['D3', 'A3', 'F#4', 'C#5']],
+                padWaveform: 'triangle'
+            },
+            rain: {
+                oscAType: 'sine', oscBType: 'sine',
+                tremoloFreq: 4.5, tremoloDepth: 0.4,
+                vibratoFreq: 4.0, vibratoDepth: 14,
+                filterCutoff: 850, delayWet: 0.6,
+                chordPool: [['A2', 'E3', 'B3', 'C4', 'G4'], ['F2', 'C3', 'G3', 'A3', 'E4'], ['D2', 'A2', 'E3', 'F3', 'C4'], ['E2', 'B2', 'F#3', 'G3', 'D4']],
+                padWaveform: 'sine'
+            },
+            aurora: {
+                oscAType: 'triangle', oscBType: 'triangle',
+                tremoloFreq: 6.0, tremoloDepth: 0.6,
+                vibratoFreq: 5.5, vibratoDepth: 18,
+                filterCutoff: 1800, delayWet: 0.5,
+                chordPool: [['F3', 'C4', 'A4', 'E5', 'G5'], ['G3', 'D4', 'B4', 'F#5'], ['E3', 'B3', 'G4', 'D5'], ['A2', 'E3', 'C4', 'G4', 'B4']],
+                padWaveform: 'sine'
+            },
+            eternity: {
+                oscAType: 'sine', oscBType: 'triangle',
+                tremoloFreq: 1.8, tremoloDepth: 0.5,
+                vibratoFreq: 3.5, vibratoDepth: 15,
+                filterCutoff: 1200, delayWet: 0.65,
+                chordPool: [['C2', 'G2', 'E3', 'B3', 'D4'], ['F2', 'C3', 'A3', 'E4', 'G4'], ['D2', 'A2', 'F3', 'C4', 'E4'], ['G1', 'D2', 'B2', 'F#3', 'A3']],
+                padWaveform: 'triangle'
+            }
+        };
+
+        const modeSoundModifiers = {
+            silk: { tremoloMult: 1.0, filterMult: 1.0 },
+            constellation: { tremoloMult: 1.35, filterMult: 1.4 },
+            orbs: { tremoloMult: 0.75, filterMult: 0.85 },
+            vortex: { tremoloMult: 1.6, filterMult: 1.3 },
+            sacred: { tremoloMult: 1.15, filterMult: 1.2 },
+            aura: { tremoloMult: 0.65, filterMult: 0.9 },
+            nebula: { tremoloMult: 0.85, filterMult: 0.75 },
+            mandala: { tremoloMult: 1.25, filterMult: 1.1 },
+            prism: { tremoloMult: 1.45, filterMult: 1.5 },
+            lotus: { tremoloMult: 0.7, filterMult: 0.95 },
+            pulse: { tremoloMult: 1.8, filterMult: 1.35 },
+            supernova: { tremoloMult: 1.5, filterMult: 1.6 },
+            ripples: { tremoloMult: 0.8, filterMult: 0.8 },
+            galaxy: { tremoloMult: 0.9, filterMult: 1.05 },
+            crystal: { tremoloMult: 1.55, filterMult: 1.65 },
+            flame: { tremoloMult: 1.3, filterMult: 1.15 }
+        };
+
+        async function initAudio() {
+            if (isAudioInitialized) return;
+            await Tone.start();
+
+            reverb = new Tone.Reverb({ decay: 8, wet: 0.65 }).toDestination();
+            await reverb.generate();
+
+            delay = new Tone.PingPongDelay({ delayTime: '4n.', feedback: 0.35, wet: 0.4 }).connect(reverb);
+
+            tremoloEffect = new Tone.Tremolo({ frequency: 5.5, depth: 0.45, spread: 90 }).connect(delay).start();
+            filterNode = new Tone.Filter({ frequency: 1400, type: 'lowpass', rolloff: -12 }).connect(tremoloEffect);
+            leadGain = new Tone.Gain(0).connect(filterNode);
+
+            leadOscA = new Tone.Oscillator({ frequency: 440, type: 'sine', volume: -10 }).connect(leadGain).start();
+            leadOscB = new Tone.Oscillator({ frequency: 440, type: 'triangle', detune: 6, volume: -15 }).connect(leadGain).start();
+
+            vibratoLFO = new Tone.LFO({ frequency: 5.2, min: -12, max: 12 }).start();
+            vibratoLFO.connect(leadOscA.detune);
+            vibratoLFO.connect(leadOscB.detune);
+
+            padSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'sine' },
+                envelope: { attack: 3.0, decay: 2.0, sustain: 0.7, release: 4.5 },
+                volume: -20
+            }).connect(reverb);
+
+            let stepIndex = 0;
+            padLoop = new Tone.Loop((time) => {
+                if (!state.audioEnabled) return;
+                const profile = soundProfiles[state.soundTheme] || soundProfiles.angels;
+                const chord = profile.chordPool[stepIndex % profile.chordPool.length];
+                padSynth.triggerAttackRelease(chord, '1m', time);
+                stepIndex++;
+            }, '1m').start(0);
+
+            Tone.Transport.bpm.value = 64;
+            Tone.Transport.start();
+
+            applySoundTheme(state.soundTheme);
+            isAudioInitialized = true;
+        }
+
+        function applySoundTheme(themeName) {
+            if (!isAudioInitialized) return;
+            const profile = soundProfiles[themeName] || soundProfiles.angels;
+            const mod = modeSoundModifiers[state.mode] || modeSoundModifiers.silk;
+
+            leadOscA.type = profile.oscAType;
+            leadOscB.type = profile.oscBType;
+            tremoloEffect.frequency.rampTo(profile.tremoloFreq * mod.tremoloMult, 0.3);
+            tremoloEffect.depth.rampTo(profile.tremoloDepth, 0.3);
+            vibratoLFO.frequency.rampTo(profile.vibratoFreq, 0.3);
+            vibratoLFO.min = -profile.vibratoDepth;
+            vibratoLFO.max = profile.vibratoDepth;
+            filterNode.frequency.rampTo(profile.filterCutoff * mod.filterMult, 0.3);
+            delay.wet.rampTo(profile.delayWet, 0.3);
+            padSynth.set({ oscillator: { type: profile.padWaveform } });
+        }
+
+        function applyModeSoundProfile(modeName) {
+            applySoundTheme(state.soundTheme);
+        }
+
+        async function toggleAudio() {
+            const btn = document.getElementById('audioToggleBtn');
+            const iconOff = document.getElementById('audioIconOff');
+            const iconOn = document.getElementById('audioIconOn');
+
+            if (!state.audioEnabled) {
+                try {
+                    await initAudio();
+                    state.audioEnabled = true;
+                    btn.classList.remove('border-zinc-700', 'bg-zinc-800/90', 'text-zinc-300');
+                    btn.classList.add('border-purple-500', 'bg-purple-950/60', 'text-purple-300');
+                    iconOff.classList.add('hidden');
+                    iconOn.classList.remove('hidden');
+                    showToast('Theremin continuo activado');
+                } catch (e) {
+                    showToast('No se pudo iniciar el sintetizador');
+                }
+            } else {
+                state.audioEnabled = false;
+                stopContinuousVoice();
+                btn.classList.remove('border-purple-500', 'bg-purple-950/60', 'text-purple-300');
+                btn.classList.add('border-zinc-700', 'bg-zinc-800/90', 'text-zinc-300');
+                iconOn.classList.add('hidden');
+                iconOff.classList.remove('hidden');
+                showToast('Audio silenciado');
+            }
+        }
+
+        function getMusicalFrequency(yRatio) {
+            const clamped = Math.max(0, Math.min(0.999, 1 - yRatio));
+            const exactPos = clamped * (scaleFrequencies.length - 1);
+            const lowIdx = Math.floor(exactPos);
+            const highIdx = Math.min(scaleFrequencies.length - 1, lowIdx + 1);
+            const frac = exactPos - lowIdx;
+            const smoothFrac = frac * frac * (3 - 2 * frac);
+            return scaleFrequencies[lowIdx] * (1 - smoothFrac) + scaleFrequencies[highIdx] * smoothFrac;
+        }
+
+        function startContinuousVoice(x, y) {
+            if (!state.audioEnabled || !isAudioInitialized) return;
+            const freq = getMusicalFrequency(y / canvas.height);
+            const panX = Math.max(-1, Math.min(1, (x / canvas.width) * 2 - 1));
+            state.currentLeadFreq = freq;
+
+            leadOscA.frequency.setValueAtTime(freq, Tone.now());
+            leadOscB.frequency.setValueAtTime(freq * 1.5, Tone.now());
+
+            const mod = modeSoundModifiers[state.mode] || modeSoundModifiers.silk;
+            const profile = soundProfiles[state.soundTheme] || soundProfiles.angels;
+            const baseCutoff = profile.filterCutoff * mod.filterMult;
+            filterNode.frequency.rampTo(baseCutoff * (0.7 + ((panX + 1) * 0.45)), 0.1);
+
+            leadGain.gain.cancelScheduledValues(Tone.now());
+            leadGain.gain.rampTo(0.45, 0.18);
+            state.isLeadPlaying = true;
+        }
+
+        function glideContinuousVoice(x, y, speed) {
+            if (!state.audioEnabled || !isAudioInitialized || !state.isLeadPlaying) return;
+            const targetFreq = getMusicalFrequency(y / canvas.height);
+            const panX = Math.max(-1, Math.min(1, (x / canvas.width) * 2 - 1));
+            state.currentLeadFreq = targetFreq;
+
+            leadOscA.frequency.rampTo(targetFreq, 0.06);
+            leadOscB.frequency.rampTo(targetFreq * 1.5, 0.06);
+
+            const mod = modeSoundModifiers[state.mode] || modeSoundModifiers.silk;
+            const profile = soundProfiles[state.soundTheme] || soundProfiles.angels;
+            const speedBoost = Math.min(1.6, 1 + speed * 0.02);
+            const baseCutoff = profile.filterCutoff * mod.filterMult;
+            filterNode.frequency.rampTo(baseCutoff * (0.7 + ((panX + 1) * 0.45)) * speedBoost, 0.08);
+        }
+
+        function stopContinuousVoice() {
+            if (!isAudioInitialized) return;
+            if (leadGain) {
+                leadGain.gain.cancelScheduledValues(Tone.now());
+                leadGain.gain.rampTo(0, 0.45);
+            }
+            state.isLeadPlaying = false;
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.remove('opacity-0');
+            clearTimeout(toast.timeout);
+            toast.timeout = setTimeout(() => {
+                toast.classList.add('opacity-0');
+            }, 2200);
+        }
+
+        class Particle {
+            constructor() {
+                this.reset(true);
+            }
+
+            reset(initial = false) {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.prevX = this.x;
+                this.prevY = this.y;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 1.5 + 0.5;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.baseSize = Math.random() * 2.5 + 1;
+                this.life = initial ? Math.random() * 200 : 0;
+                this.maxLife = Math.random() * 300 + 200;
+                this.freqIndex = Math.floor(Math.random() * 72);
+                this.pickColor();
+            }
+
+            pickColor() {
+                const colors = palettes[state.palette];
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+            }
+
+            update() {
+                this.prevX = this.x;
+                this.prevY = this.y;
+                this.life++;
+
+                if (this.life > this.maxLife) {
+                    this.reset();
+                    return;
+                }
+
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const dxCenter = this.x - centerX;
+                const dyCenter = this.y - centerY;
+                const distCenter = Math.sqrt(dxCenter * dxCenter + dyCenter * dyCenter) || 1;
+                const maxOrbitRadius = Math.min(canvas.width, canvas.height) * 0.42;
+
+                if (state.rhythmEnabled) {
+                    const binEnergy = (state.spectrum[this.freqIndex] || 0) / 255;
+
+                    if (state.bassEnergy > 0.08) {
+                        const bassPush = state.bassEnergy * (1.2 + binEnergy * 1.6);
+                        this.vx += (dxCenter / distCenter) * bassPush;
+                        this.vy += (dyCenter / distCenter) * bassPush;
+                    }
+
+                    if (state.vocalEnergy > 0.08) {
+                        const waveFlow = Math.sin(this.y * 0.015 + state.vocalRibbonPhase) * state.vocalEnergy * (1.0 + binEnergy * 1.2);
+                        const liftFlow = Math.cos(this.x * 0.012 - state.vocalRibbonPhase * 0.8) * state.vocalEnergy * 0.8;
+                        this.vx += waveFlow;
+                        this.vy += liftFlow;
+                    }
+
+                    if (state.trebleEnergy > 0.1) {
+                        const jitter = state.trebleEnergy * 0.9;
+                        this.vx += (Math.random() - 0.5) * jitter;
+                        this.vy += (Math.random() - 0.5) * jitter;
+                    }
+
+                    if (distCenter > maxOrbitRadius) {
+                        const pullBack = ((distCenter - maxOrbitRadius) / maxOrbitRadius) * 0.45;
+                        this.vx -= (dxCenter / distCenter) * pullBack;
+                        this.vy -= (dyCenter / distCenter) * pullBack;
+                    }
+                }
+
+                if (state.pointers.length > 0) {
+                    for (let p = 0; p < state.pointers.length; p++) {
+                        const ptr = state.pointers[p];
+                        const dx = ptr.x - this.x;
+                        const dy = ptr.y - this.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        const maxDist = 260;
+
+                        if (dist < maxDist && dist > 1) {
+                            const forceFactor = (1 - dist / maxDist) * (state.force * 0.15);
+                            this.vx += (dx / dist) * forceFactor;
+                            this.vy += (dy / dist) * forceFactor;
+                        }
+                    }
+                }
+
+                if (state.mode === 'vortex') {
+                    const angle = Math.atan2(dyCenter, dxCenter) + 0.02;
+                    this.vx += Math.cos(angle + Math.PI / 2) * 0.15 - (dxCenter * 0.0005);
+                    this.vy += Math.sin(angle + Math.PI / 2) * 0.15 - (dyCenter * 0.0005);
+                } else {
+                    const noiseScale = 0.004;
+                    const angle = (Math.cos(this.x * noiseScale) + Math.sin(this.y * noiseScale)) * Math.PI;
+                    this.vx += Math.cos(angle) * 0.12;
+                    this.vy += Math.sin(angle) * 0.12;
+                }
+
+                this.vx *= 0.94;
+                this.vy *= 0.94;
+
+                const maxSpeed = state.rhythmEnabled ? (6 + state.bassEnergy * 5 + state.vocalEnergy * 4) : 8;
+                const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (currentSpeed > maxSpeed) {
+                    this.vx = (this.vx / currentSpeed) * maxSpeed;
+                    this.vy = (this.vy / currentSpeed) * maxSpeed;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                if (this.x < 0) {
+                    this.x = 0;
+                    this.vx = Math.abs(this.vx) * 0.8;
+                    this.prevX = this.x;
+                } else if (this.x > canvas.width) {
+                    this.x = canvas.width;
+                    this.vx = -Math.abs(this.vx) * 0.8;
+                    this.prevX = this.x;
+                }
+
+                if (this.y < 0) {
+                    this.y = 0;
+                    this.vy = Math.abs(this.vy) * 0.8;
+                    this.prevY = this.y;
+                } else if (this.y > canvas.height) {
+                    this.y = canvas.height;
+                    this.vy = -Math.abs(this.vy) * 0.8;
+                    this.prevY = this.y;
+                }
+            }
+
+            draw() {
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const sym = state.symmetry;
+                const binEnergy = state.rhythmEnabled ? ((state.spectrum[this.freqIndex] || 0) / 255) : 0;
+                const size = this.baseSize * state.brushScale * (state.rhythmEnabled ? (0.85 + binEnergy * 1.4 + state.beatEnergy * 0.4) : 1);
+                const alpha = Math.sin((this.life / this.maxLife) * Math.PI) * 0.85;
+
+                ctx.strokeStyle = this.color;
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = Math.max(0.05, alpha);
+
+                for (let i = 0; i < sym; i++) {
+                    const angle = (i * Math.PI * 2) / sym;
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(angle);
+                    ctx.translate(-centerX, -centerY);
+
+                    if (state.mode === 'silk' || state.mode === 'vortex') {
+                        ctx.lineWidth = size;
+                        ctx.lineCap = 'round';
+                        ctx.beginPath();
+                        ctx.moveTo(this.prevX, this.prevY);
+                        ctx.lineTo(this.x, this.y);
+                        ctx.stroke();
+                    } else if (state.mode === 'orbs') {
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, size * 2.2, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.globalAlpha = alpha * 0.22;
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, size * 4.2, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (state.mode === 'constellation') {
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, size * 1.4, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (state.mode === 'sacred') {
+                        ctx.lineWidth = Math.max(0.8, size * 0.7);
+                        ctx.save();
+                        ctx.translate(this.x, this.y);
+                        ctx.rotate(this.life * 0.03);
+                        ctx.beginPath();
+                        const r = size * 3.8;
+                        for (let s = 0; s < 3; s++) {
+                            const a = (s * Math.PI * 2) / 3;
+                            const px = Math.cos(a) * r;
+                            const py = Math.sin(a) * r;
+                            if (s === 0) ctx.moveTo(px, py);
+                            else ctx.lineTo(px, py);
+                        }
+                        ctx.closePath();
+                        ctx.stroke();
+                        ctx.restore();
+                    } else if (state.mode === 'aura') {
+                        const radius = size * 6.5;
+                        const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, radius);
+                        grad.addColorStop(0, this.color);
+                        grad.addColorStop(1, 'transparent');
+                        ctx.globalAlpha = alpha * 0.24;
+                        ctx.fillStyle = grad;
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, radius, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (state.mode === 'nebula') {
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, size * 1.2, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(this.x + this.vx * 3, this.y + this.vy * 3, size * 0.8, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.globalAlpha = alpha * 0.14;
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, size * 5, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (state.mode === 'mandala') {
+                        ctx.lineWidth = Math.max(0.8, size * 0.8);
+                        ctx.save();
+                        ctx.translate(this.x, this.y);
+                        ctx.rotate(Math.atan2(this.vy, this.vx));
+                        ctx.beginPath();
+                        ctx.moveTo(-size * 3, 0);
+                        ctx.quadraticCurveTo(0, -size * 2.5, size * 3, 0);
+                        ctx.quadraticCurveTo(0, size * 2.5, -size * 3, 0);
+                        ctx.stroke();
+                        ctx.restore();
+                    } else if (state.mode === 'prism') {
+                        ctx.lineWidth = Math.max(0.9, size * 0.75);
+                        ctx.save();
+                        ctx.translate(this.x, this.y);
+                        ctx.rotate(this.life * 0.04 + binEnergy * 2);
+                        const r = size * 3.6;
+                        ctx.beginPath();
+                        ctx.moveTo(0, -r * 1.3);
+                        ctx.lineTo(r * 0.8, 0);
+                        ctx.lineTo(0, r * 1.3);
+                        ctx.lineTo(-r * 0.8, 0);
+                        ctx.closePath();
+                        ctx.stroke();
+                        ctx.restore();
+                    } else if (state.mode === 'lotus') {
+                        ctx.lineWidth = Math.max(0.8, size * 0.7);
+                        ctx.save();
+                        ctx.translate(this.x, this.y);
+                        ctx.rotate(this.life * 0.015);
+                        const petals = 4;
+                        const r = size * 3.2;
+                        for (let pt = 0; pt < petals; pt++) {
+                            ctx.rotate(Math.PI / 2);
+                            ctx.beginPath();
+                            ctx.ellipse(r * 0.6, 0, r * 0.65, r * 0.28, 0, 0, Math.PI * 2);
+                            ctx.stroke();
+                        }
+                        ctx.restore();
+                    } else if (state.mode === 'pulse') {
+                        ctx.lineWidth = Math.max(1.0, size * 0.85);
+                        const midX = (this.prevX + this.x) / 2;
+                        const midY = (this.prevY + this.y) / 2;
+                        const perpX = -(this.y - this.prevY) * (1.2 + binEnergy * 2.5);
+                        const perpY = (this.x - this.prevX) * (1.2 + binEnergy * 2.5);
+                        ctx.beginPath();
+                        ctx.moveTo(this.prevX, this.prevY);
+                        ctx.lineTo(midX + perpX, midY + perpY);
+                        ctx.lineTo(this.x, this.y);
+                        ctx.stroke();
+                    } else if (state.mode === 'supernova') {
+                        ctx.lineWidth = Math.max(0.8, size * 0.65);
+                        ctx.save();
+                        ctx.translate(this.x, this.y);
+                        ctx.rotate(this.life * 0.02);
+                        const spike = size * (4.2 + binEnergy * 3.5);
+                        ctx.beginPath();
+                        ctx.moveTo(-spike, 0);
+                        ctx.lineTo(spike, 0);
+                        ctx.moveTo(0, -spike);
+                        ctx.lineTo(0, spike);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.arc(0, 0, size * 1.1, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    } else if (state.mode === 'ripples') {
+                        ctx.lineWidth = Math.max(0.8, size * 0.6);
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, size * 2.6, 0, Math.PI * 2);
+                        ctx.stroke();
+                        ctx.globalAlpha = alpha * 0.35;
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, size * 4.5, 0, Math.PI * 2);
+                        ctx.stroke();
+                    } else if (state.mode === 'galaxy') {
+                        ctx.save();
+                        ctx.translate(this.x, this.y);
+                        ctx.rotate(this.life * 0.05);
+                        ctx.beginPath();
+                        ctx.arc(0, 0, size * 1.3, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(size * 2.6, 0, size * 0.75, 0, Math.PI * 2);
+                        ctx.arc(-size * 2.6, 0, size * 0.75, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    } else if (state.mode === 'crystal') {
+                        ctx.lineWidth = Math.max(0.8, size * 0.7);
+                        ctx.save();
+                        ctx.translate(this.x, this.y);
+                        ctx.rotate(this.life * 0.025);
+                        const r = size * 3.4;
+                        ctx.beginPath();
+                        for (let h = 0; h < 6; h++) {
+                            const a = (h * Math.PI) / 3;
+                            const hx = Math.cos(a) * r;
+                            const hy = Math.sin(a) * r;
+                            if (h === 0) ctx.moveTo(hx, hy);
+                            else ctx.lineTo(hx, hy);
+                        }
+                        ctx.closePath();
+                        ctx.stroke();
+                        ctx.restore();
+                    } else if (state.mode === 'flame') {
+                        ctx.save();
+                        ctx.translate(this.x, this.y);
+                        const h = size * (4.5 + binEnergy * 3.0);
+                        const w = size * 1.8;
+                        ctx.beginPath();
+                        ctx.moveTo(0, -h);
+                        ctx.quadraticCurveTo(w, 0, 0, w * 0.8);
+                        ctx.quadraticCurveTo(-w, 0, 0, -h);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+
+                    ctx.restore();
+                }
+            }
+        }
+
+        function syncParticleCount(newCount) {
+            state.count = newCount;
+            while (state.particles.length < newCount) {
+                state.particles.push(new Particle());
+            }
+            while (state.particles.length > newCount) {
+                state.particles.pop();
+            }
+        }
+        syncParticleCount(state.count);
+
+        function drawConstellationLines() {
+            if (state.mode !== 'constellation') return;
+            const maxDist = 85;
+            const len = Math.min(state.particles.length, 140);
+
+            ctx.lineWidth = 0.75 * state.brushScale;
+            for (let i = 0; i < len; i++) {
+                const p1 = state.particles[i];
+                for (let j = i + 1; j < len; j++) {
+                    const p2 = state.particles[j];
+                    const dx = p1.x - p2.x;
+                    const dy = p1.y - p2.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < maxDist) {
+                        ctx.globalAlpha = (1 - dist / maxDist) * 0.35;
+                        ctx.strokeStyle = p1.color;
+                        ctx.beginPath();
+                        ctx.moveTo(p1.x, p1.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        function drawShockwavesAndPointers() {
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const colors = palettes[state.palette] || palettes.neon;
+
+            if (state.rhythmEnabled) {
+                const viz = state.vizStyle || 'radar';
+
+                if (viz === 'radar') {
+                    const dialRadius = Math.min(canvas.width, canvas.height) * (0.13 + state.beatEnergy * 0.02);
+
+                    if (state.bassEnergy > 0.06) {
+                        const coreRadius = Math.min(canvas.width, canvas.height) * (0.16 + state.bassEnergy * 0.26);
+                        const grad = ctx.createRadialGradient(cx, cy, dialRadius * 0.8, cx, cy, coreRadius);
+                        grad.addColorStop(0, colors[0]);
+                        grad.addColorStop(0.5, colors[1] || colors[0]);
+                        grad.addColorStop(1, 'transparent');
+                        ctx.globalAlpha = Math.min(0.32, state.bassEnergy * 0.35);
+                        ctx.fillStyle = grad;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, coreRadius, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    const barsCount = 72;
+                    ctx.save();
+                    for (let b = 0; b < barsCount; b++) {
+                        const specVal = (state.spectrum[b] || 0) / 255;
+                        if (specVal < 0.04) continue;
+                        const angle = -Math.PI / 2 + (b * Math.PI * 2) / barsCount;
+                        const barLen = 6 + Math.pow(specVal, 1.35) * Math.min(canvas.width, canvas.height) * 0.22;
+                        const rStart = dialRadius + 4;
+                        const rEnd = rStart + barLen;
+
+                        let barColor = colors[0];
+                        if (b < 16) barColor = colors[0];
+                        else if (b < 32) barColor = colors[4] || colors[0];
+                        else if (b < 52) barColor = colors[3] || colors[1];
+                        else barColor = colors[2] || '#38bdf8';
+
+                        ctx.globalAlpha = 0.28 + specVal * 0.68;
+                        ctx.strokeStyle = barColor;
+                        ctx.lineWidth = Math.max(2.0, (Math.PI * 2 * rStart) / barsCount * 0.55);
+                        ctx.lineCap = 'round';
+                        ctx.beginPath();
+                        ctx.moveTo(cx + Math.cos(angle) * rStart, cy + Math.sin(angle) * rStart);
+                        ctx.lineTo(cx + Math.cos(angle) * rEnd, cy + Math.sin(angle) * rEnd);
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+
+                    ctx.save();
+                    ctx.globalAlpha = 0.85;
+                    ctx.fillStyle = 'rgba(9, 9, 11, 0.86)';
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, dialRadius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.globalAlpha = 0.35 + state.beatEnergy * 0.45;
+                    ctx.strokeStyle = colors[0];
+                    ctx.lineWidth = 1.8;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, dialRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    const arcRadius = dialRadius * 0.84;
+                    for (let b = 0; b < 4; b++) {
+                        const startAngle = -Math.PI / 2 + (b * Math.PI) / 2 + 0.12;
+                        const endAngle = startAngle + Math.PI / 2 - 0.24;
+                        const isActiveBeat = (state.beatCount === b) && (state.beatEnergy > 0.12 || state.bpmEstimate > 0);
+
+                        ctx.globalAlpha = isActiveBeat ? (0.5 + state.beatEnergy * 0.5) : 0.16;
+                        ctx.strokeStyle = isActiveBeat ? (b === 0 ? (colors[1] || '#ffffff') : colors[0]) : '#71717a';
+                        ctx.lineWidth = isActiveBeat ? (3.8 + state.beatEnergy * 2.5) : 2.2;
+                        ctx.lineCap = 'round';
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, arcRadius, startAngle, endAngle);
+                        ctx.stroke();
+
+                        const numAngle = -Math.PI / 2 + (b * Math.PI) / 2 + Math.PI / 4;
+                        const nx = cx + Math.cos(numAngle) * (dialRadius * 0.62);
+                        const ny = cy + Math.sin(numAngle) * (dialRadius * 0.62);
+                        ctx.globalAlpha = isActiveBeat ? 0.95 : 0.32;
+                        ctx.fillStyle = isActiveBeat ? '#ffffff' : '#a1a1aa';
+                        ctx.font = `600 ${Math.max(9, Math.round(dialRadius * 0.18))}px Inter, sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(`${b + 1}`, nx, ny);
+                    }
+
+                    ctx.globalAlpha = 0.95;
+                    ctx.fillStyle = '#fafafa';
+                    ctx.font = `700 ${Math.max(12, Math.round(dialRadius * 0.27))}px Inter, sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(state.bpmEstimate > 0 ? `${state.bpmEstimate}` : '•••', cx, cy - dialRadius * 0.06);
+
+                    ctx.globalAlpha = 0.7;
+                    ctx.fillStyle = colors[1] || '#e879f9';
+                    ctx.font = `600 ${Math.max(8, Math.round(dialRadius * 0.14))}px Inter, sans-serif`;
+                    ctx.fillText('BPM • RITMO', cx, cy + dialRadius * 0.19);
+                    ctx.restore();
+
+                    for (let i = state.shockwaves.length - 1; i >= 0; i--) {
+                        const sw = state.shockwaves[i];
+                        sw.radius += 6.5 + state.beatEnergy * 5.5 + state.bassEnergy * 4.5;
+                        sw.alpha *= 0.94;
+                        ctx.globalAlpha = Math.max(0, sw.alpha * 0.75);
+                        ctx.strokeStyle = sw.color;
+                        ctx.lineWidth = sw.lineWidth;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, sw.radius, 0, Math.PI * 2);
+                        ctx.stroke();
+                        if (sw.alpha < 0.03 || sw.radius > sw.maxRadius) {
+                            state.shockwaves.splice(i, 1);
+                        }
+                    }
+
+                    for (let i = state.hihatFlashes.length - 1; i >= 0; i--) {
+                        const hf = state.hihatFlashes[i];
+                        hf.alpha *= 0.82;
+                        hf.length *= 0.92;
+                        const rInner = hf.innerRadius;
+                        const rOuter = hf.innerRadius + hf.length;
+                        ctx.save();
+                        ctx.globalAlpha = Math.max(0, hf.alpha * 0.95);
+                        ctx.strokeStyle = hf.color;
+                        ctx.lineWidth = 2.6;
+                        ctx.lineCap = 'round';
+                        ctx.beginPath();
+                        ctx.moveTo(cx + Math.cos(hf.angle) * rOuter, cy + Math.sin(hf.angle) * rOuter);
+                        ctx.lineTo(cx + Math.cos(hf.angle) * rInner, cy + Math.sin(hf.angle) * rInner);
+                        ctx.stroke();
+                        ctx.restore();
+                        if (hf.alpha < 0.05) state.hihatFlashes.splice(i, 1);
+                    }
+                } else if (viz === 'bars') {
+                    const totalW = Math.min(canvas.width * 0.86, 820);
+                    const startX = cx - totalW / 2;
+                    const count = 64;
+                    const stepW = totalW / count;
+                    const barW = Math.max(3, stepW * 0.68);
+                    const maxH = canvas.height * 0.28;
+
+                    ctx.save();
+                    for (let i = 0; i < count; i++) {
+                        const val = (state.spectrum[i] || 0) / 255;
+                        const h = 4 + Math.pow(val, 1.25) * maxH;
+                        const bx = startX + i * stepW + (stepW - barW) / 2;
+                        const col = colors[i % colors.length];
+
+                        ctx.globalAlpha = 0.35 + val * 0.65;
+                        ctx.fillStyle = col;
+                        ctx.beginPath();
+                        ctx.roundRect(bx, cy - h, barW, h * 2, 4);
+                        ctx.fill();
+
+                        ctx.globalAlpha = 0.85;
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(bx, cy - h - 4, barW, 2);
+                        ctx.fillRect(bx, cy + h + 2, barW, 2);
+                    }
+                    ctx.restore();
+                } else if (viz === 'terrain') {
+                    const layers = state.spectrumHistory.length;
+                    ctx.save();
+                    for (let l = layers - 1; l >= 0; l--) {
+                        const row = state.spectrumHistory[l];
+                        if (!row) continue;
+                        const depth = l / Math.max(1, layers);
+                        const yBase = cy + canvas.height * 0.24 - depth * canvas.height * 0.38;
+                        const spanW = canvas.width * (0.92 - depth * 0.35);
+                        const x0 = cx - spanW / 2;
+                        const alpha = (1 - depth) * 0.65;
+
+                        ctx.globalAlpha = Math.max(0.06, alpha);
+                        ctx.strokeStyle = colors[l % colors.length];
+                        ctx.lineWidth = l === 0 ? 2.6 : 1.4;
+                        ctx.beginPath();
+                        for (let s = 0; s < 64; s++) {
+                            const t = s / 63;
+                            const val = (row[s] || 0) / 255;
+                            const peak = Math.pow(val, 1.3) * (canvas.height * 0.22) * (1 - depth * 0.4);
+                            const px = x0 + t * spanW;
+                            const py = yBase - peak;
+                            if (s === 0) ctx.moveTo(px, py);
+                            else ctx.lineTo(px, py);
+                        }
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                } else if (viz === 'strings') {
+                    const stringCount = 8;
+                    const spanW = Math.min(canvas.width * 0.88, 860);
+                    const x0 = cx - spanW / 2;
+                    const verticalSpan = canvas.height * 0.56;
+                    const yTop = cy - verticalSpan / 2;
+
+                    ctx.save();
+                    for (let st = 0; st < stringCount; st++) {
+                        const bandIdx = Math.floor((st / stringCount) * 68);
+                        const energy = (state.spectrum[bandIdx] || 0) / 255;
+                        const baseY = yTop + (st / (stringCount - 1)) * verticalSpan;
+                        const col = colors[st % colors.length];
+
+                        ctx.globalAlpha = 0.28 + energy * 0.72;
+                        ctx.strokeStyle = col;
+                        ctx.lineWidth = 1.5 + energy * 3.0;
+                        ctx.beginPath();
+                        for (let x = 0; x <= 64; x++) {
+                            const t = x / 64;
+                            const env = Math.sin(t * Math.PI);
+                            const harmonic = st + 1;
+                            const vib = Math.sin(t * Math.PI * harmonic + state.vocalRibbonPhase * (1.2 + st * 0.2)) * energy * 38 * env;
+                            const px = x0 + t * spanW;
+                            const py = baseY + vib;
+                            if (x === 0) ctx.moveTo(px, py);
+                            else ctx.lineTo(px, py);
+                        }
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                } else if (viz === 'tunnel') {
+                    const rings = 10;
+                    const sides = 6;
+                    const maxR = Math.max(canvas.width, canvas.height) * 0.55;
+                    const phase = (performance.now() * 0.0012 + state.bassEnergy * 0.4) % 1;
+
+                    ctx.save();
+                    for (let r = 0; r < rings; r++) {
+                        const t = ((r / rings) + phase) % 1;
+                        const radius = 24 + Math.pow(t, 1.8) * maxR;
+                        const specIdx = Math.floor(t * 60);
+                        const boost = 1 + ((state.spectrum[specIdx] || 0) / 255) * 0.25;
+                        const rot = t * 1.2 + state.vocalRibbonPhase * 0.15;
+
+                        ctx.globalAlpha = Math.sin(t * Math.PI) * (0.35 + state.beatEnergy * 0.55);
+                        ctx.strokeStyle = colors[r % colors.length];
+                        ctx.lineWidth = 1.5 + t * 3.2;
+                        ctx.beginPath();
+                        for (let s = 0; s <= sides; s++) {
+                            const a = rot + (s * Math.PI * 2) / sides;
+                            const px = cx + Math.cos(a) * radius * boost;
+                            const py = cy + Math.sin(a) * radius * boost;
+                            if (s === 0) ctx.moveTo(px, py);
+                            else ctx.lineTo(px, py);
+                        }
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                } else if (viz === 'dna') {
+                    const spanW = Math.min(canvas.width * 0.85, 800);
+                    const x0 = cx - spanW / 2;
+                    const nodes = 36;
+
+                    ctx.save();
+                    for (let n = 0; n < nodes; n++) {
+                        const t = n / (nodes - 1);
+                        const px = x0 + t * spanW;
+                        const spec = (state.spectrum[n * 2] || 0) / 255;
+                        const amp = 28 + spec * 110 + state.bassEnergy * 45;
+                        const angle = t * Math.PI * 4 + state.vocalRibbonPhase * 0.6;
+                        const y1 = cy + Math.sin(angle) * amp;
+                        const y2 = cy - Math.sin(angle) * amp;
+
+                        ctx.globalAlpha = 0.22 + spec * 0.55;
+                        ctx.strokeStyle = colors[2] || '#a855f7';
+                        ctx.lineWidth = 1.4;
+                        ctx.beginPath();
+                        ctx.moveTo(px, y1);
+                        ctx.lineTo(px, y2);
+                        ctx.stroke();
+
+                        ctx.globalAlpha = 0.85;
+                        ctx.fillStyle = colors[0];
+                        ctx.beginPath();
+                        ctx.arc(px, y1, 3 + spec * 4.5, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.fillStyle = colors[1] || '#ec4899';
+                        ctx.beginPath();
+                        ctx.arc(px, y2, 3 + spec * 4.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.restore();
+                } else if (viz === 'matrix') {
+                    const cols = 24;
+                    const rows = 14;
+                    const gridW = Math.min(canvas.width * 0.82, 740);
+                    const gridH = Math.min(canvas.height * 0.52, 380);
+                    const x0 = cx - gridW / 2;
+                    const y0 = cy - gridH / 2;
+                    const cellW = gridW / cols;
+                    const cellH = gridH / rows;
+
+                    ctx.save();
+                    for (let c = 0; c < cols; c++) {
+                        const val = (state.spectrum[c * 3] || 0) / 255;
+                        const litRows = Math.round(val * rows);
+                        for (let r = 0; r < rows; r++) {
+                            const rowFromBottom = rows - 1 - r;
+                            const active = rowFromBottom < litRows;
+                            ctx.globalAlpha = active ? 0.88 : 0.10;
+                            ctx.fillStyle = active
+                                ? (rowFromBottom > rows * 0.75 ? '#ffffff' : colors[c % colors.length])
+                                : '#52525b';
+                            ctx.beginPath();
+                            ctx.roundRect(x0 + c * cellW + 2, y0 + r * cellH + 2, cellW - 4, cellH - 4, 3);
+                            ctx.fill();
+                        }
+                    }
+                    ctx.restore();
+                } else if (viz === 'scope') {
+                    const spanW = Math.min(canvas.width * 0.88, 860);
+                    const x0 = cx - spanW / 2;
+                    const yBass = cy - canvas.height * 0.14;
+                    const yVocal = cy + canvas.height * 0.14;
+
+                    ctx.save();
+                    ctx.globalAlpha = 0.14;
+                    ctx.strokeStyle = '#a1a1aa';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x0, cy - canvas.height * 0.28, spanW, canvas.height * 0.56);
+
+                    ctx.globalAlpha = 0.88;
+                    ctx.strokeStyle = colors[0];
+                    ctx.lineWidth = 2.6;
+                    ctx.beginPath();
+                    for (let i = 0; i < 72; i++) {
+                        const t = i / 71;
+                        const val = ((state.spectrum[i] || 0) / 255) * (i < 24 ? 1.3 : 0.6);
+                        const px = x0 + t * spanW;
+                        const py = yBass - val * 85 * Math.sin(t * Math.PI);
+                        if (i === 0) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                    ctx.stroke();
+
+                    ctx.strokeStyle = colors[3] || '#fef08a';
+                    ctx.lineWidth = 2.4;
+                    ctx.beginPath();
+                    for (let w = 0; w < 128; w++) {
+                        const t = w / 127;
+                        const sample = ((state.vocalWave[w * 2] || 128) - 128) / 128;
+                        const px = x0 + t * spanW;
+                        const py = yVocal + sample * (25 + state.vocalEnergy * 95);
+                        if (w === 0) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                    ctx.stroke();
+                    ctx.restore();
+                } else if (viz === 'horizon') {
+                    const waves = [
+                        { energy: state.bassEnergy, freq: 2.5, color: colors[0], offset: 45 },
+                        { energy: state.lowMidEnergy, freq: 4.0, color: colors[4] || colors[1], offset: 15 },
+                        { energy: state.vocalEnergy, freq: 6.5, color: colors[3] || '#fef08a', offset: -15 },
+                        { energy: state.trebleEnergy, freq: 10.0, color: colors[2] || '#38bdf8', offset: -45 }
+                    ];
+
+                    ctx.save();
+                    waves.forEach((wv, idx) => {
+                        ctx.globalAlpha = 0.35 + wv.energy * 0.55;
+                        ctx.strokeStyle = wv.color;
+                        ctx.lineWidth = 2.2 + wv.energy * 2.5;
+                        ctx.beginPath();
+                        for (let x = 0; x <= canvas.width; x += 14) {
+                            const t = x / canvas.width;
+                            const env = Math.sin(t * Math.PI);
+                            const y = cy + wv.offset + Math.sin(t * Math.PI * wv.freq + state.vocalRibbonPhase * (0.7 + idx * 0.25)) * (12 + wv.energy * 95) * env;
+                            if (x === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.stroke();
+                    });
+                    ctx.restore();
+                } else if (viz === 'bloom') {
+                    const petals = 24;
+                    const baseR = Math.min(canvas.width, canvas.height) * 0.08;
+                    ctx.save();
+                    ctx.translate(cx, cy);
+                    ctx.rotate(state.vocalRibbonPhase * 0.08);
+                    for (let p = 0; p < petals; p++) {
+                        const val = (state.spectrum[p * 3] || 0) / 255;
+                        const angle = (p * Math.PI * 2) / petals;
+                        const len = baseR + val * Math.min(canvas.width, canvas.height) * 0.28;
+                        const spread = (Math.PI / petals) * (0.75 + val * 0.5);
+
+                        ctx.globalAlpha = 0.25 + val * 0.65;
+                        ctx.strokeStyle = colors[p % colors.length];
+                        ctx.lineWidth = 2.0 + val * 2.0;
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.quadraticCurveTo(
+                            Math.cos(angle - spread) * len * 0.7,
+                            Math.sin(angle - spread) * len * 0.7,
+                            Math.cos(angle) * len,
+                            Math.sin(angle) * len
+                        );
+                        ctx.quadraticCurveTo(
+                            Math.cos(angle + spread) * len * 0.7,
+                            Math.sin(angle + spread) * len * 0.7,
+                            0,
+                            0
+                        );
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+
+                if (viz !== 'radar') {
+                    ctx.save();
+                    ctx.globalAlpha = 0.85;
+                    ctx.fillStyle = '#fafafa';
+                    ctx.font = '700 13px Inter, sans-serif';
+                    ctx.textAlign = 'center';
+                    const bpmLabel = state.bpmEstimate > 0 ? `${state.bpmEstimate} BPM • COMPÁS ${state.beatCount + 1}/4` : `COMPÁS ${state.beatCount + 1}/4`;
+                    ctx.fillText(bpmLabel, cx, Math.max(36, cy - canvas.height * 0.34));
+                    ctx.restore();
+                }
+
+                if (state.vocalEnergy > 0.05 && (viz === 'radar' || viz === 'tunnel' || viz === 'bloom')) {
+                    const widthSpan = Math.min(canvas.width * 0.84, 720);
+                    const startX = cx - widthSpan / 2;
+                    const segments = 128;
+                    const amp = 16 + state.vocalEnergy * 75;
+                    const waveLen = state.vocalWave.length;
+
+                    ctx.save();
+                    ctx.globalAlpha = Math.min(0.75, 0.18 + state.vocalEnergy * 0.65);
+                    ctx.strokeStyle = colors[3] || '#fef08a';
+                    ctx.lineWidth = 2.0 + state.vocalEnergy * 2.2;
+                    ctx.beginPath();
+                    for (let i = 0; i <= segments; i++) {
+                        const t = i / segments;
+                        const env = Math.sin(t * Math.PI);
+                        const wIdx = Math.floor(t * (waveLen - 1));
+                        const realSample = ((state.vocalWave[wIdx] || 128) - 128) / 128;
+                        const yOff = realSample * amp * env;
+                        const px = startX + t * widthSpan;
+                        const py = cy + yOff;
+                        if (i === 0) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                    ctx.stroke();
+
+                    ctx.globalAlpha = Math.min(0.45, state.vocalEnergy * 0.5);
+                    ctx.strokeStyle = colors[1] || '#fb7185';
+                    ctx.lineWidth = 1.4 + state.vocalEnergy * 1.5;
+                    ctx.beginPath();
+                    for (let i = 0; i <= segments; i++) {
+                        const t = i / segments;
+                        const env = Math.sin(t * Math.PI);
+                        const wIdx = Math.floor(t * (waveLen - 1));
+                        const realSample = ((state.vocalWave[wIdx] || 128) - 128) / 128;
+                        const yOff = -realSample * amp * 0.72 * env;
+                        const px = startX + t * widthSpan;
+                        const py = cy + yOff;
+                        if (i === 0) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                for (let i = state.vocalSparks.length - 1; i >= 0; i--) {
+                    const sp = state.vocalSparks[i];
+                    const prevX = sp.x;
+                    const prevY = sp.y;
+                    sp.x += sp.vx;
+                    sp.y += sp.vy;
+                    sp.alpha *= 0.90;
+                    sp.size *= 0.95;
+
+                    ctx.save();
+                    ctx.globalAlpha = Math.max(0, sp.alpha * 0.45);
+                    ctx.strokeStyle = sp.color;
+                    ctx.lineWidth = sp.size * 0.9;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(prevX, prevY);
+                    ctx.lineTo(sp.x, sp.y);
+                    ctx.stroke();
+
+                    ctx.globalAlpha = Math.max(0, sp.alpha * 0.8);
+                    ctx.fillStyle = sp.color;
+                    ctx.beginPath();
+                    ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+
+                    if (sp.alpha < 0.04) {
+                        state.vocalSparks.splice(i, 1);
+                    }
+                }
+            }
+
+            for (let p = 0; p < state.pointers.length; p++) {
+                const ptr = state.pointers[p];
+                ctx.globalAlpha = 0.25;
+                ctx.strokeStyle = colors[p % colors.length];
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(ptr.x, ptr.y, 26, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        function animate() {
+            if (!state.isPaused) {
+                updateAudioReactivity();
+
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = `rgba(9, 9, 11, ${state.trailAlpha})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                for (let i = 0; i < state.particles.length; i++) {
+                    state.particles[i].update();
+                    state.particles[i].draw();
+                }
+
+                drawConstellationLines();
+                drawS
