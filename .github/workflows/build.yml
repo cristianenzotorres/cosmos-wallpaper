@@ -28,7 +28,7 @@ jobs:
 
       - name: Build debug APK
         run: |
-          gradle --no-daemon wrapper --gradle-version 8.5
+          gradle --no-daemon wrapper --gradle-version 8.9
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
 
