@@ -3,13 +3,26 @@ plugins {
     id("org.jetbrains.kotlin.android") version "1.9.20"
 }
 
-sourceSets {
-    getByName("main") {
-        manifest.srcFile("src/main/src/main/AndroidManifest.xml")
-        java.srcDir("src/main")
-        assets.srcDir("src/assets")
+android {
+    namespace = "com.cosmos.audiorhythmwallpaper"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.cosmos.audiorhythmwallpaper"
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
     }
-}
+
+    sourceSets {
+        getByName("main") {
+            manifest.srcFile("src/main/src/main/AndroidManifest.xml")
+            java.srcDir("src/main")
+            assets.srcDir("src/assets")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
