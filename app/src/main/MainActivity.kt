@@ -41,9 +41,7 @@ import kotlin.math.sqrt
 private const val STUDIO_ASSET = "file:///android_asset/Cosmos%20Generativo.html"
 private const val CHANNEL_ID = "cosmos_audio_capture"
 
-private object CaptureState {
-    @Volatile var onBands: ((String) -> Unit)? = null
-}
+private object CaptureState { @Volatile var onBands: ((String) -> Unit)? = null }
 
 @SuppressLint("SetJavaScriptEnabled")
 private fun configureWebView(view: WebView) {
@@ -79,7 +77,7 @@ private const val RHYTHM_BRIDGE = """
   else if(mode==='tunnel'){var tm=performance.now()/1000;for(var z=0;z<10;z++){var ph=(z/10+tm*.25)%1,rr=18+ph*Math.min(w,h)*.48;ctx.globalAlpha=.15+ph*.55;ctx.strokeStyle=c[z%5];ctx.lineWidth=2+v[z%4]*3;ctx.beginPath();for(var side=0;side<N;side++){var aa=side*Math.PI*2/N,deform=1+s[side]*.12,px=cx+Math.cos(aa)*rr*deform,py=cy+Math.sin(aa)*rr*deform;if(side===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.closePath();ctx.stroke()}}
   else{for(var d=0;d<38;d++){var rt=d/37,xx=w*.08+rt*w*.84,amp=20+s[d*2%N]*Math.min(w,h)*.16,aa=rt*Math.PI*4+performance.now()/500,y1=cy+Math.sin(aa)*amp,y2=cy-Math.sin(aa)*amp;ctx.globalAlpha=.3+s[d*2%N]*.7;ctx.fillStyle=c[d%5];ctx.beginPath();ctx.arc(xx,y1,2+s[d*2%N]*5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(xx,y2,2+s[d*2%N]*5,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=.7;ctx.strokeStyle='#d946ef';ctx.beginPath();for(var dl=0;dl<=38;dl++){var rr=dl/38,xx=w*.08+rr*w*.84,dy=cy+Math.sin(rr*Math.PI*4+performance.now()/500)*(20+v[2]*Math.min(w,h)*.16);if(dl===0)ctx.moveTo(xx,dy);else ctx.lineTo(xx,dy)}ctx.stroke()}
   ctx.restore();requestAnimationFrame(draw)}requestAnimationFrame(draw);
-  var rhythm=document.getElementById('rhythmToggleBtn');if(rhythm&&!rhythm.dataset.cosmosNative){rhythm.dataset.cosmosNative='1';rhythm.addEventListener('click',function(e){e.preventDefault();e.stopImmediatePropagation();if(window.CosmosApp)window.CosmosApp.enableAudioReaction()},true)}
+  var rhythm=document.getElementById('rhythmToggleBtn');if(rhythm&&!rhythm.dataset.cosmosNative){rhythm.dataset.cosmosNative='1';rhythm.addEventListener('click',function(e){e.preventEvent?.();e.preventDefault();e.stopImmediatePropagation();if(window.CosmosApp)window.CosmosApp.enableAudioReaction()},true)}
 })();
 """
 
@@ -98,9 +96,7 @@ class MainActivity : ComponentActivity() {
             ContextCompat.startForegroundService(this, intent)
             captureActive = true
             Toast.makeText(this, "Captura activa. Reproduce música en RiPlay.", Toast.LENGTH_LONG).show()
-        } else {
-            Toast.makeText(this, "No se autorizó la captura.", Toast.LENGTH_LONG).show()
-        }
+        } else Toast.makeText(this, "No se autorizó la captura.", Toast.LENGTH_LONG).show()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -172,55 +168,31 @@ class PlaybackCaptureService : android.app.Service() {
         const val EXTRA_RESULT_CODE = "result_code"
         const val EXTRA_RESULT_DATA = "result_data"
     }
-
     private var projection: MediaProjection? = null
     private val analyzer = PlaybackAnalyzer()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            stopCapture()
-            stopSelf()
-            return START_NOT_STICKY
-        }
+        if (intent?.action == ACTION_STOP) { stopCapture(); stopSelf(); return START_NOT_STICKY }
         if (intent?.action != ACTION_START) return START_NOT_STICKY
-        createChannel()
-        startForegroundInternal()
-
+        createChannel(); startForegroundInternal()
         val code = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
         @Suppress("DEPRECATION")
         val data = intent.getParcelableExtra(EXTRA_RESULT_DATA) as? Intent
-        if (code != Activity.RESULT_OK || data == null) {
-            reportError("No se recibió la autorización de captura")
-            stopCapture()
-            stopSelf()
-            return START_NOT_STICKY
-        }
-
+        if (code != Activity.RESULT_OK || data == null) { reportError("No se recibió la autorización"); stopCapture(); stopSelf(); return START_NOT_STICKY }
         try {
             val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            val activeProjection = manager.getMediaProjection(code, data)
-            projection = activeProjection
-            analyzer.start(activeProjection) { json -> CaptureState.onBands?.invoke(json) }
-            if (!analyzer.isRunning()) {
-                reportError("No se pudo iniciar la captura interna")
-                stopCapture()
-                stopSelf()
-            }
-        } catch (e: Exception) {
-            reportError("Captura no disponible: " + (e.localizedMessage ?: "error"))
-            stopCapture()
-            stopSelf()
-        }
+            projection = manager.getMediaProjection(code, data)
+            analyzer.start(projection!!) { json -> CaptureState.onBands?.invoke(json) }
+            if (!analyzer.isRunning()) { reportError("No se pudo iniciar la captura interna"); stopCapture(); stopSelf() }
+        } catch (e: Exception) { reportError("Captura no disponible: " + (e.localizedMessage ?: "error")); stopCapture(); stopSelf() }
         return START_NOT_STICKY
     }
 
     private fun createChannel() {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Captura de audio", NotificationManager.IMPORTANCE_LOW))
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Captura de audio", NotificationManager.IMPORTANCE_LOW))
     }
 
     private fun startForegroundInternal() {
@@ -233,9 +205,8 @@ class PlaybackCaptureService : android.app.Service() {
             .setOngoing(true)
             .addAction(android.app.Notification.Action.Builder(null, "Detener", pending).build())
             .build()
-        if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(7102, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
-        } else startForeground(7102, notification)
+        if (Build.VERSION.SDK_INT >= 29) startForeground(7102, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+        else startForeground(7102, notification)
     }
 
     private fun reportError(message: String) {
@@ -243,32 +214,19 @@ class PlaybackCaptureService : android.app.Service() {
         CaptureState.onBands?.invoke("{\"error\":" + escaped + "}")
     }
 
-    private fun stopCapture() {
-        analyzer.stop()
-        projection?.stop()
-        projection = null
-        stopForeground(STOP_FOREGROUND_REMOVE)
-    }
-
-    override fun onDestroy() {
-        stopCapture()
-        super.onDestroy()
-    }
+    private fun stopCapture() { analyzer.stop(); projection?.stop(); projection = null; stopForeground(STOP_FOREGROUND_REMOVE) }
+    override fun onDestroy() { stopCapture(); super.onDestroy() }
 }
 
 private class PlaybackAnalyzer {
     @Volatile private var running = false
     @Volatile private var recorder: AudioRecord? = null
     private var worker: Thread? = null
-
     fun isRunning() = running
 
     @Synchronized fun stop() {
         running = false
-        recorder?.let { record ->
-            try { record.stop() } catch (_: Exception) {}
-            try { record.release() } catch (_: Exception) {}
-        }
+        recorder?.let { record -> try { record.stop() } catch (_: Exception) {}; try { record.release() } catch (_: Exception) {} }
         recorder = null
         worker?.interrupt()
         worker = null
@@ -276,24 +234,14 @@ private class PlaybackAnalyzer {
 
     @Synchronized fun start(projection: MediaProjection, onBands: (String) -> Unit) {
         if (running || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
-        val captureConfig = AudioPlaybackCaptureConfiguration.Builder(projection)
-            .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
-            .addMatchingUsage(AudioAttributes.USAGE_GAME)
-            .build()
-        val format = AudioFormat.Builder()
-            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-            .setSampleRate(16000)
-            .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
-            .build()
+        val captureConfig = AudioPlaybackCaptureConfiguration.Builder(projection).addMatchingUsage(AudioAttributes.USAGE_MEDIA).addMatchingUsage(AudioAttributes.USAGE_GAME).build()
+        val format = AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(16000).setChannelMask(AudioFormat.CHANNEL_IN_MONO).build()
         val minimum = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         if (minimum <= 0) return
-        val record = try {
-            AudioRecord.Builder().setAudioFormat(format).setBufferSizeInBytes(maxOf(minimum, 4096)).setAudioPlaybackCaptureConfig(captureConfig).build()
-        } catch (_: Exception) { return }
+        val record = try { AudioRecord.Builder().setAudioFormat(format).setBufferSizeInBytes(maxOf(minimum, 4096)).setAudioPlaybackCaptureConfig(captureConfig).build() } catch (_: Exception) { return }
         if (record.state != AudioRecord.STATE_INITIALIZED) { record.release(); return }
         recorder = record
         running = true
-
         worker = thread(name = "cosmos-playback", start = true) {
             val samples = ShortArray(1024)
             var bassEnvelope = 0f
@@ -351,13 +299,11 @@ private class PlaybackAnalyzer {
 
 class CosmosWallpaperService : WallpaperService() {
     override fun onCreateEngine(): Engine = CosmosEngine()
-
     inner class CosmosEngine : Engine() {
         private val handler = Handler(Looper.getMainLooper())
         private var webView: WebView? = null
         private var framePending = false
         private var destroyed = false
-
         private val drawFrame = object : Runnable {
             override fun run() {
                 framePending = false
@@ -365,17 +311,11 @@ class CosmosWallpaperService : WallpaperService() {
                 if (destroyed || !isVisible) return
                 view.invalidate()
                 var canvas: Canvas? = null
-                try {
-                    canvas = surfaceHolder.lockCanvas()
-                    if (canvas != null) view.draw(canvas)
-                } catch (_: Exception) {
-                } finally {
-                    if (canvas != null) try { surfaceHolder.unlockCanvasAndPost(canvas) } catch (_: Exception) {}
-                }
+                try { canvas = surfaceHolder.lockCanvas(); if (canvas != null) view.draw(canvas) } catch (_: Exception) {}
+                finally { if (canvas != null) try { surfaceHolder.unlockCanvasAndPost(canvas) } catch (_: Exception) {} }
                 scheduleFrame()
             }
         }
-
         @SuppressLint("SetJavaScriptEnabled")
         override fun onCreate(surfaceHolder: SurfaceHolder?) {
             super.onCreate(surfaceHolder)
@@ -393,40 +333,17 @@ class CosmosWallpaperService : WallpaperService() {
             }
             view.loadUrl(STUDIO_ASSET)
         }
-
         override fun onSurfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
             super.onSurfaceChanged(holder, format, width, height)
-            if (width > 0 && height > 0) {
-                webView?.apply {
-                    measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
-                    layout(0, 0, width, height)
-                    evaluateJavascript("if(typeof resizeCanvas==='function')resizeCanvas()", null)
-                }
-            }
+            if (width > 0 && height > 0) webView?.apply { measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)); layout(0, 0, width, height); evaluateJavascript("if(typeof resizeCanvas==='function')resizeCanvas()", null) }
             scheduleFrame()
         }
-
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
-            if (visible) { webView?.onResume(); scheduleFrame() }
-            else { handler.removeCallbacks(drawFrame); framePending = false; webView?.onPause() }
+            if (visible) { webView?.onResume(); scheduleFrame() } else { handler.removeCallbacks(drawFrame); framePending = false; webView?.onPause() }
         }
-
         override fun onTouchEvent(event: MotionEvent) { webView?.dispatchTouchEvent(event); super.onTouchEvent(event) }
-
-        private fun scheduleFrame() {
-            if (destroyed || !isVisible || framePending || webView == null) return
-            framePending = true
-            handler.postDelayed(drawFrame, 16L)
-        }
-
-        override fun onDestroy() {
-            destroyed = true
-            handler.removeCallbacks(drawFrame)
-            framePending = false
-            webView?.apply { stopLoading(); onPause(); removeAllViews(); destroy() }
-            webView = null
-            super.onDestroy()
-        }
+        private fun scheduleFrame() { if (destroyed || !isVisible || framePending || webView == null) return; framePending = true; handler.postDelayed(drawFrame, 16L) }
+        override fun onDestroy() { destroyed = true; handler.removeCallbacks(drawFrame); framePending = false; webView?.apply { stopLoading(); onPause(); removeAllViews(); destroy() }; webView = null; super.onDestroy() }
     }
 }
