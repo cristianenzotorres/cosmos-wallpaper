@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Estudio de Arte Generativo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: #09090b;
+            color: #fafafa;
+            width: 100vw;
+            height: 100vh;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.15);
+            height: 6px;
+            border-radius: 999px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #a855f7;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+    </style>
+</head>
+<body class="relative w-screen h-screen select-none">
+    <canvas id="artCanvas"></canvas>
+    <div id="toast" class="fixed top-5 left-1/2 transform -translate-x-1/2 bg-zinc-800/90 backdrop-blur-md text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg border border-zinc-700 opacity-0 transition-opacity duration-300 pointer-events-none z-50">Mensaje</div>
+
+    <button id="togglePanelBtn" class="fixed top-4 right-4 z-40 bg-zinc-900/80 hover:bg-zinc-800 backdrop-blur-md text-white p-3 rounded-2xl border border-zinc-700/70 shadow-xl transition-all flex items-center gap-2 text-sm font-medium">Controles</button>
+
+    <div id="controlPanel" class="fixed top-16 right-4 w-72 sm:w-80 bg-zinc-900/85 backdrop-blur-xl border border-zinc-700/70 rounded-3xl p-5 shadow-2xl z-30 transition-all duration-300 flex flex-col gap-4 max-h-[85vh] overflow-y-auto">
+        <h1 class="text-base font-bold text-white tracking-tight">Cosmos Generativo</h1>
+        <p class="text-xs text-zinc-400">Desliza para crear luz y un canto trémolo infinito.</p>
+
+        <div class="grid grid-cols-2 gap-2">
+            <button id="rhythmToggleBtn" class="py-2.5 px-3 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-medium">Modo Audiorítmico</button>
+            <button id="audioToggleBtn" class="py-2.5 px-3 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-medium"><span id="audioIconOff">Activar Audio</span><span id="audioIconOn" class="hidden">Audio activo</span></button>
+        </div>
+
+        <div id="rhythmMeterBox" class="hidden space-y-2 bg-zinc-950/60 p-3 rounded-xl border border-zinc-800">
+            <div class="flex justify-between items-center text-[11px] text-zinc-400"><span>Audio reactivo</span><span id="tempoBadge" class="text-fuchsia-300 font-mono">-- BPM</span></div>
+            <div class="space-y-2">
+                <div><div class="flex justify-between text-[10px]"><span>Bombo</span><span id="bassPct">0%</span></div><div class="h-1.5 bg-zinc-800 rounded-full"><div id="bassBar" class="h-full bg-fuchsia-500 rounded-full" style="width:0%"></div></div></div>
+                <div><div class="flex justify-between text-[10px]"><span>Bajo</span><span id="lowMidPct">0%</span></div><div class="h-1.5 bg-zinc-800 rounded-full"><div id="lowMidBar" class="h-full bg-indigo-400 rounded-full" style="width:0%"></div></div></div>
+                <div><div class="flex justify-between text-[10px]"><span>Voz</span><span id="vocalPct">0%</span></div><div class="h-1.5 bg-zinc-800 rounded-full"><div id="vocalBar" class="h-full bg-amber-400 rounded-full" style="width:0%"></div></div></div>
+                <div><div class="flex justify-between text-[10px]"><span>Agudos</span><span id="treblePct">0%</span></div><div class="h-1.5 bg-zinc-800 rounded-full"><div id="trebleBar" class="h-full bg-cyan-400 rounded-full" style="width:0%"></div></div></div>
+            </div>
+            <span id="beatStatus" class="text-xs text-zinc-400">Escuchando...</span>
+        </div>
+
+        <div class="space-y-1.5">
+            <label class="text-xs font-medium text-zinc-300">Paleta de Color</label>
+            <div class="grid grid-cols-3 gap-1.5">
+                <button data-palette="neon" class="palette-btn py-1.5 px-2 rounded-xl text-xs bg-zinc-800 border-2 border-purple-500 text-white">Neón</button>
+                <button data-palette="sunset" class="palette-btn py-1.5 px-2 rounded-xl text-xs bg-zinc-800 border-2 border-transparent text-zinc-300">Ocaso</button>
+                <button data-palette="ocean" class="palette-btn py-1.5 px-2 rounded-xl text-xs bg-zinc-800 border-2 border-transparent text-zinc-300">Abisal</button>
+                <button data-palette="gold" class="palette-btn py-1.5 px-2 rounded-xl text-xs bg-zinc-800 border-2 border-transparent text-zinc-300">Dorado</button>
+                <button data-palette="aurora" class="palette-btn py-1.5 px-2 rounded-xl text-xs bg-zinc-800 border-2 border-transparent text-zinc-300">Aurora</button>
+                <button data-palette="celestial" class="palette-btn py-1.5 px-2 rounded-xl text-xs bg-zinc-800 border-2 border-transparent text-zinc-300">Celestial</button>
+            </div>
+        </div>
+
+        <div class="space-y-1.5">
+            <label class="text-xs font-medium text-zinc-300">Diseño / Estilo Artístico</label>
+            <div class="grid grid-cols-4 gap-1 bg-zinc-950/60 p-1 rounded-xl border border-zinc-800">
+                <button data-mode="silk" class="mode-btn py-1.5 text-[11px] rounded-lg bg-zinc-800 text-white">Seda</button>
+                <button data-mode="constellation" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Red</button>
+                <button data-mode="orbs" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Orbes</button>
+                <button data-mode="vortex" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Espiral</button>
+                <button data-mode="sacred" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Geometría</button>
+                <button data-mode="aura" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Aura</button>
+                <button data-mode="nebula" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Nebulosa</button>
+                <button data-mode="mandala" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Mandala</button>
+                <button data-mode="prism" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Prisma</button>
+                <button data-mode="lotus" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Loto</button>
+                <button data-mode="pulse" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Pulso</button>
+                <button data-mode="supernova" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Nova</button>
+                <button data-mode="ripples" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Ondas</button>
+                <button data-mode="galaxy" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Galaxia</button>
+                <button data-mode="crystal" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Cristal</button>
+                <button data-mode="flame" class="mode-btn py-1.5 text-[11px] rounded-lg text-zinc-400">Fuego</button>
+            </div>
+        </div>
+
+        <div class="space-y-3">
+            <div><div class="flex justify-between text-xs mb-1"><span>Cantidad de Partículas</span><span id="countVal" class="text-purple-400">120</span></div><input type="range" id="particleCount" min="30" max="300" value="120" class="w-full"></div>
+            <div><div class="flex justify-between text-xs mb-1"><span>Grosor / Escala</span><span id="sizeVal" class="text-purple-400">1.0x</span></div><input type="range" id="brushScale" min="0.3" max="3" step="0.1" value="1" class="w-full"></div>
+            <div><div class="flex justify-between text-xs mb-1"><span>Estela</span><span id="trailVal" class="text-purple-400">92%</span></div><input type="range" id="trailLength" min="50" max="99" value="92" class="w-full"></div>
+            <div><div class="flex justify-between text-xs mb-1"><span>Fuerza de Interacción</span><span id="forceVal" class="text-purple-400">5</span></div><input type="range" id="interactionForce" min="-10" max="15" value="5" class="w-full"></div>
+            <div><div class="flex justify-between text-xs mb-1"><span>Simetría Caleidoscopio</span><span id="symmetryVal" class="text-purple-400">1x</span></div><input type="range" id="symmetry" min="1" max="8" value="1" class="w-full"></div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800">
+            <button id="clearBtn" class="py-2 px-3 bg-zinc-800 text-zinc-200 rounded-xl text-xs">Limpiar</button>
+            <button id="pauseBtn" class="py-2 px-3 bg-zinc-800 text-zinc-200 rounded-xl text-xs"><span id="pauseText">Pausar</span></button>
+        </div>
+        <button id="saveBtn" class="w-full py-2.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-semibold">Descargar Obra (PNG)</button>
+        <button id="installWallpaperBtn" class="w-full py-2.5 px-4 bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-xl text-xs font-medium">Instalar Fondo Vivo</button>
+    </div>
+
+    <div id="wallpaperModal" class="hidden"></div>
+
+    <script>
+        const canvas = document.getElementById('artCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            const w = window.innerWidth || document.documentElement.clientWidth || 360;
+            const h = window.innerHeight || document.documentElement.clientHeight || 640;
+            if (w > 0 && h > 0) {
+                canvas.width = w;
+                canvas.height = h;
+                ctx.fillStyle = '#09090b';
+                ctx.fillRect(0, 0, w, h);
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const palettes = {
+            neon: ['#a855f7','#ec4899','#3b82f6','#10b981','#8b5cf6'],
+            sunset: ['#f97316','#ef4444','#eab308','#db2777','#f59e0b'],
+            ocean: ['#06b6d4','#3b82f6','#0284c7','#2dd4bf','#6366f1'],
+            gold: ['#fbbf24','#d97706','#fef08a','#b45309','#f59e0b'],
+            aurora: ['#34d399','#2dd4bf','#818cf8','#c084fc','#a7f3d0'],
+            celestial: ['#f8fafc','#e2e8f0','#bae6fd','#ddd6fe','#fef08a']
+        };
+
+        const state = {
+            particles: [], count: 120, brushScale: 1, trailAlpha: 0.08,
+            force: 5, symmetry: 1, mode: 'silk', palette: 'neon', isPaused: false,
+            pointers: [], audioEnabled: false, rhythmEnabled: false, rhythmSimulated: false,
+            bassEnergy: 0, lowMidEnergy: 0, vocalEnergy: 0, trebleEnergy: 0,
+            spectrum: new Uint8Array(72), bpmEstimate: 0, beatCount: 0,
+            shockwaves: [], hihatFlashes: [], vocalSparks: [], spectrumHistory: []
+        };
+
+        let rhythmAudioCtx = null;
+        let rhythmAnalyser = null;
+        let rhythmStream = null;
+        let rhythmDataArray = null;
+
+        class Particle {
+            constructor(){ this.reset(true); }
+            reset(initial=false){
+                this.x=Math.random()*canvas.width; this.y=Math.random()*canvas.height;
+                this.prevX=this.x; this.prevY=this.y;
+                const a=Math.random()*Math.PI*2, s=Math.random()*1.5+0.5;
+                this.vx=Math.cos(a)*s; this.vy=Math.sin(a)*s;
+                this.baseSize=Math.random()*2.5+1;
+                this.life=initial?Math.random()*200:0;
+                this.maxLife=Math.random()*300+200;
+                this.freqIndex=Math.floor(Math.random()*72);
+                this.pickColor();
+            }
+            pickColor(){
+                const c=palettes[state.palette]; this.color=c[Math.floor(Math.random()*c.length)];
+            }
+            update(){
+                this.prevX=this.x; this.prevY=this.y; this.life++;
+                if(this.life>this.maxLife){ this.reset(); return; }
+
+                const cx=canvas.width/2, cy=canvas.height/2;
+                const dx=this.x-cx, dy=this.y-cy;
+                const dist=Math.sqrt(dx*dx+dy*dy)||1;
+
+                for(const p of state.pointers){
+                    const px=p.x-this.x, py=p.y-this.y;
+                    const pd=Math.sqrt(px*px+py*py);
+                    if(pd<260 && pd>1){
+                        const f=(1-pd/260)*(state.force*0.15);
+                        this.vx+=(px/pd)*f; this.vy+=(py/pd)*f;
+                    }
+                }
+
+                if(state.mode==='vortex'){
+                    const angle=Math.atan2(dy,dx)+0.02;
+                    this.vx+=Math.cos(angle+Math.PI/2)*0.15-(dx*0.0005);
+                    this.vy+=Math.sin(angle+Math.PI/2)*0.15-(dy*0.0005);
+                } else {
+                    const angle=(Math.cos(this.x*0.004)+Math.sin(this.y*0.004))*Math.PI;
+                    this.vx+=Math.cos(angle)*0.12; this.vy+=Math.sin(angle)*0.12;
+                }
+
+                if(state.rhythmEnabled){
+                    const energy=(state.spectrum[this.freqIndex]||0)/255;
+                    this.vx+=(dx/dist)*state.bassEnergy*(1.2+energy*1.6);
+                    this.vy+=(dy/dist)*state.bassEnergy*(1.2+energy*1.6);
+                }
+
+                this.vx*=0.94; this.vy*=0.94;
+                const speed=Math.sqrt(this.vx*this.vx+this.vy*this.vy);
+                const maxSpeed=8;
+                if(speed>maxSpeed){ this.vx=this.vx/speed*maxSpeed; this.vy=this.vy/speed*maxSpeed; }
+                this.x+=this.vx; this.y+=this.vy;
+
+                if(this.x<0||this.x>canvas.width){ this.vx*=-0.8; this.x=Math.max(0,Math.min(canvas.width,this.x)); }
+                if(this.y<0||this.y>canvas.height){ this.vy*=-0.8; this.y=Math.max(0,Math.min(canvas.height,this.y)); }
+            }
+            draw(){
+                const size=this.baseSize*state.brushScale;
+                const alpha=Math.sin(this.life/this.maxLife*Math.PI)*0.85;
+                ctx.strokeStyle=this.color; ctx.fillStyle=this.color; ctx.globalAlpha=Math.max(.05,alpha);
+
+                for(let i=0;i<state.symmetry;i++){
+                    ctx.save();
+                    ctx.translate(canvas.width/2,canvas.height/2);
+                    ctx.rotate(i*Math.PI*2/state.symmetry);
+                    ctx.translate(-canvas.width/2,-canvas.height/2);
+
+                    if(state.mode==='orbs'||state.mode==='nebula'||state.mode==='galaxy'||state.mode==='aura'||state.mode==='flame'){
+                        ctx.beginPath(); ctx.arc(this.x,this.y,size*(state.mode==='flame'?2.5:2),0,Math.PI*2); ctx.fill();
+                    } else if(state.mode==='sacred'||state.mode==='prism'||state.mode==='crystal'||state.mode==='mandala'||state.mode==='lotus'||state.mode==='ripples'||state.mode==='supernova'||state.mode==='pulse'){
+                        ctx.lineWidth=Math.max(.8,size*.75); ctx.beginPath(); ctx.arc(this.x,this.y,size*2.8,0,Math.PI*2); ctx.stroke();
+                    } else {
+                        ctx.lineWidth=size; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(this.prevX,this.prevY); ctx.lineTo(this.x,this.y); ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+            }
+        }
+
+        function syncParticleCount(n){
+            state.count=n;
+            while(state.particles.length<n) state.particles.push(new Particle());
+            while(state.particles.length>n) state.particles.pop();
+        }
+        syncParticleCount(state.count);
+
+        async function toggleRhythmMode(){
+            if(state.rhythmEnabled){
+                state.rhythmEnabled=false;
+                if(rhythmStream){ rhythmStream.getTracks().forEach(t=>t.stop()); rhythmStream=null; }
+                if(rhythmAudioCtx){ try{await rhythmAudioCtx.close();}catch(e){} rhythmAudioCtx=null; }
+                document.getElementById('rhythmMeterBox').classList.add('hidden');
+                return;
+            }
+            try{
+                if(!navigator.mediaDevices?.getUserMedia) throw new Error('Micrófono no disponible');
+                rhythmStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+                const AC=window.AudioContext||window.webkitAudioContext;
+                rhythmAudioCtx=new AC();
+                if(rhythmAudioCtx.state==='suspended') await rhythmAudioCtx.resume();
+                const source=rhythmAudioCtx.createMediaStreamSource(rhythmStream);
+                rhythmAnalyser=rhythmAudioCtx.createAnalyser(); rhythmAnalyser.fftSize=2048;
+                rhythmAnalyser.smoothingTimeConstant=.65;
+                source.connect(rhythmAnalyser);
+                rhythmDataArray=new Uint8Array(rhythmAnalyser.frequencyBinCount);
+                state.rhythmEnabled=true; state.rhythmSimulated=false;
+                document.getElementById('rhythmMeterBox').classList.remove('hidden');
+            }catch(e){
+                state.rhythmEnabled=true; state.rhythmSimulated=true;
+                document.getElementById('rhythmMeterBox').classList.remove('hidden');
+            }
+        }
+
+        function updateReactivity(){
+            if(!state.rhythmEnabled) return;
+            let bass=0, low=.1, vocal=.1, treble=.1;
+            if(!state.rhythmSimulated && rhythmAnalyser && rhythmDataArray){
+                rhythmAnalyser.getByteFrequencyData(rhythmDataArray);
+                const sampleRate=rhythmAudioCtx?.sampleRate||48000;
+                const binHz=(sampleRate/2)/rhythmDataArray.length;
+                const band=(lowHz,highHz)=>{
+                    const a=Math.max(1,Math.floor(lowHz/binHz));
+                    const b=Math.min(rhythmDataArray.length-1,Math.floor(highHz/binHz));
+                    let sum=0,max=0;
+                    for(let i=a;i<=b;i++){ const v=rhythmDataArray[i]/255; sum+=v; max=Math.max(max,v); }
+                    return Math.min(1,(sum/Math.max(1,b-a+1))*.35+max*.65);
+                };
+                bass=band(25,110); low=band(110,320); vocal=band(320,2800); treble=band(6500,16000);
+                for(let i=0;i<72;i++){
+                    const idx=Math.floor(i/72*(rhythmDataArray.length-1));
+                    state.spectrum[i]=rhythmDataArray[idx];
+                }
+            } else {
+                const t=performance.now()/1000;
+                bass=Math.pow(Math.max(0,1-((t*2)%1)*3.5),2)*.82;
+                low=(Math.sin(t*4)*.5+.5)*.65;
+                vocal=(Math.sin(t*2.4)*.5+.5)*.72;
+                treble=Math.pow(Math.max(0,1-((t*4)%1)*5),2)*.78;
+            }
+            state.bassEnergy=state.bassEnergy*.35+bass*.65;
+            state.lowMidEnergy=state.lowMidEnergy*.42+low*.58;
+            state.vocalEnergy=state.vocalEnergy*.36+vocal*.64;
+            state.trebleEnergy=state.trebleEnergy*.25+treble*.75;
+
+            document.getElementById('bassPct').textContent=Math.round(state.bassEnergy*100)+'%';
+            document.getElementById('lowMidPct').textContent=Math.round(state.lowMidEnergy*100)+'%';
+            document.getElementById('vocalPct').textContent=Math.round(state.vocalEnergy*100)+'%';
+            document.getElementById('treblePct').textContent=Math.round(state.trebleEnergy*100)+'%';
+            document.getElementById('bassBar').style.width=Math.round(state.bassEnergy*100)+'%';
+            document.getElementById('lowMidBar').style.width=Math.round(state.lowMidEnergy*100)+'%';
+            document.getElementById('vocalBar').style.width=Math.round(state.vocalEnergy*100)+'%';
+            document.getElementById('trebleBar').style.width=Math.round(state.trebleEnergy*100)+'%';
+        }
+
+        function drawAudioVisuals(){
+            if(!state.rhythmEnabled) return;
+            const cx=canvas.width/2, cy=canvas.height/2;
+            const c=palettes[state.palette];
+            const radius=Math.min(canvas.width,canvas.height)*(.13+state.bassEnergy*.03);
+
+            ctx.save();
+            ctx.globalAlpha=.18+state.bassEnergy*.45;
+            ctx.strokeStyle=c[0]; ctx.lineWidth=2;
+            ctx.beginPath(); ctx.arc(cx,cy,radius,0,Math.PI*2); ctx.stroke();
+
+            for(let i=0;i<72;i++){
+                const v=(state.spectrum[i]||0)/255;
+                if(v<.04) continue;
+                const a=-Math.PI/2+i*Math.PI*2/72;
+                const len=5+v*Math.min(canvas.width,canvas.height)*.18;
+                ctx.globalAlpha=.25+v*.65;
+                ctx.strokeStyle=c[i%c.length]; ctx.lineWidth=2;
+                ctx.beginPath();
+                ctx.moveTo(cx+Math.cos(a)*(radius+4),cy+Math.sin(a)*(radius+4));
+                ctx.lineTo(cx+Math.cos(a)*(radius+4+len),cy+Math.sin(a)*(radius+4+len));
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function animate(){
+            if(!state.isPaused){
+                updateReactivity();
+                ctx.globalAlpha=1;
+                ctx.fillStyle=`rgba(9,9,11,${state.trailAlpha})`;
+                ctx.fillRect(0,0,canvas.width,canvas.height);
+                for(const p of state.particles){ p.update(); p.draw(); }
+                drawAudioVisuals();
+            }
+            requestAnimationFrame(animate);
+        }
+
+        let lastMove={x:0,y:0};
+        canvas.addEventListener('pointerdown',e=>{ canvas.setPointerCapture?.(e.pointerId); state.pointers.push({id:e.pointerId,x:e.clientX,y:e.clientY}); lastMove={x:e.clientX,y:e.clientY}; });
+        canvas.addEventListener('pointermove',e=>{ const p=state.pointers.find(x=>x.id===e.pointerId); if(p){ p.x=e.clientX; p.y=e.clientY; lastMove={x:e.clientX,y:e.clientY}; } });
+        canvas.addEventListener('pointerup',e=>{ state.pointers=state.pointers.filter(p=>p.id!==e.pointerId); });
+        canvas.addEventListener('pointercancel',e=>{ state.pointers=state.pointers.filter(p=>p.id!==e.pointerId); });
+
+        document.getElementById('togglePanelBtn').addEventListener('click',()=>document.getElementById('controlPanel').classList.toggle('hidden'));
+        document.getElementById('rhythmToggleBtn').addEventListener('click',toggleRhythmMode);
+
+        document.querySelectorAll('.palette-btn').forEach(btn=>btn.addEventListener('click',()=>{
+            document.querySelectorAll('.palette-btn').forEach(b=>b.classList.remove('border-purple-500','text-white'));
+            btn.classList.add('border-purple-500','text-white');
+            state.palette=btn.dataset.palette;
+            state.particles.forEach(p=>p.pickColor());
+        }));
+
+        document.querySelectorAll('.mode-btn').forEach(btn=>btn.addEventListener('click',()=>{
+            document.querySelectorAll('.mode-btn').forEach(b=>{b.classList.remove('bg-zinc-800','text-white');b.classList.add('text-zinc-400');});
+            btn.classList.remove('text-zinc-400'); btn.classList.add('bg-zinc-800','text-white');
+            state.mode=btn.dataset.mode;
+        }));
+
+        document.getElementById('particleCount').addEventListener('input',e=>{ const n=+e.target.value; document.getElementById('countVal').textContent=n; syncParticleCount(n); });
+        document.getElementById('brushScale').addEventListener('input',e=>{ state.brushScale=+e.target.value; document.getElementById('sizeVal').textContent=state.brushScale.toFixed(1)+'x'; });
+        document.getElementById('trailLength').addEventListener('input',e=>{ const v=+e.target.value; document.getElementById('trailVal').textContent=v+'%'; state.trailAlpha=(100-v)/100; });
+        document.getElementById('interactionForce').addEventListener('input',e=>{ state.force=+e.target.value; document.getElementById('forceVal').textContent=state.force; });
+        document.getElementById('symmetry').addEventListener('input',e=>{ state.symmetry=+e.target.value; document.getElementById('symmetryVal').textContent=state.symmetry+'x'; });
+
+        document.getElementById('clearBtn').addEventListener('click',()=>{ ctx.fillStyle='#09090b'; ctx.fillRect(0,0,canvas.width,canvas.height); });
+        document.getElementById('pauseBtn').addEventListener('click',()=>{ state.isPaused=!state.isPaused; document.getElementById('pauseText').textContent=state.isPaused?'Reanudar':'Pausar'; });
+        document.getElementById('saveBtn').addEventListener('click',()=>{ const a=document.createElement('a'); a.download='cosmos-generativo-'+Date.now()+'.png'; a.href=canvas.toDataURL('image/png'); a.click(); });
+
+        document.getElementById('installWallpaperBtn').addEventListener('click',()=>{
+            if(window.CosmosApp?.setLiveWallpaper) window.CosmosApp.setLiveWallpaper();
+        });
+
+        animate();
+    </script>
+</body>
+</html>
