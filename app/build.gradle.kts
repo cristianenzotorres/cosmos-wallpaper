@@ -7,10 +7,10 @@ android {
     compileSdk = 34
     defaultConfig {
         applicationId = "com.cosmos.audiorhythmwallpaper"
-        minSdk = 24
+        minSdk = 29
         targetSdk = 34
-        versionCode = 8
-        versionName = "1.7"
+        versionCode = 9
+        versionName = "1.8"
     }
     sourceSets {
         getByName("main") {
