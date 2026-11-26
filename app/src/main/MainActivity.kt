@@ -33,14 +33,9 @@ class MainActivity : ComponentActivity() {
     private val requestMicPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) {
-            openWallpaperPicker()
-        } else {
-            Toast.makeText(
-                this,
-                "Sin permiso de micrófono, el fondo no reaccionará al audio.",
-                Toast.LENGTH_LONG
-            ).show()
+        if (granted) openWallpaperPicker()
+        else {
+            Toast.makeText(this, "Sin permiso de micrófono, el fondo no reaccionará al audio.", Toast.LENGTH_LONG).show()
             openWallpaperPicker()
         }
     }
@@ -77,37 +72,23 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkMicPermissionAndOpenPicker() {
-        val permissionGranted = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (permissionGranted) {
-            openWallpaperPicker()
-        } else {
-            requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
-        }
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (granted) openWallpaperPicker()
+        else requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
     }
 
     private fun openWallpaperPicker() {
-        val wallpaperIntent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
-            putExtra(
-                WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                ComponentName(this@MainActivity, CosmosWallpaperService::class.java)
-            )
+        val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
+            putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, ComponentName(this@MainActivity, CosmosWallpaperService::class.java))
         }
 
         try {
-            startActivity(wallpaperIntent)
+            startActivity(intent)
         } catch (_: Exception) {
             try {
                 startActivity(Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER))
             } catch (_: Exception) {
-                Toast.makeText(
-                    this,
-                    "No se pudo abrir el selector de fondos.",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(this, "No se pudo abrir el selector de fondos.", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -136,18 +117,11 @@ class CosmosWallpaperService : WallpaperService() {
                 var canvas: Canvas? = null
                 try {
                     canvas = surfaceHolder.lockCanvas()
-                    if (canvas != null) {
-                        view.draw(canvas)
-                    }
+                    if (canvas != null) view.draw(canvas)
                 } catch (_: Exception) {
-                    // La superficie puede cambiar mientras Android actualiza el fondo.
                 } finally {
                     if (canvas != null) {
-                        try {
-                            surfaceHolder.unlockCanvasAndPost(canvas)
-                        } catch (_: Exception) {
-                            // La superficie ya no está disponible.
-                        }
+                        try { surfaceHolder.unlockCanvasAndPost(canvas) } catch (_: Exception) {}
                     }
                 }
 
@@ -182,29 +156,30 @@ class CosmosWallpaperService : WallpaperService() {
                 view.webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
-
-                        // Fuerza el modo limpio dentro del motor de fondo vivo.
-                        val script = """
+                        val cleanModeScript = """
                             (function() {
-                                var panel = document.getElementById('controlPanel');
-                                var toggle = document.getElementById('togglePanelBtn');
-                                var modal = document.getElementById('wallpaperModal');
-                                var exit = document.getElementById('exitWallpaperBtn');
-                                var toast = document.getElementById('toast');
-                                if (panel) panel.classList.add('hidden');
-                                if (toggle) toggle.classList.add('hidden');
-                                if (modal) modal.classList.add('hidden');
-                                if (exit) exit.classList.add('hidden');
-                                if (toast) toast.classList.add('hidden');
-                                if (typeof resizeCanvas === 'function') resizeCanvas();
-                                if (typeof toggleRhythmMode === 'function' && !window.__cosmosNativeRhythmStarted) {
-                                    window.__cosmosNativeRhythmStarted = true;
-                                    toggleRhythmMode();
+                                document.documentElement.style.background='#09090b';
+                                document.body.style.background='#09090b';
+                                ['controlPanel','togglePanelBtn','wallpaperModal','exitWallpaperBtn','toast'].forEach(function(id){
+                                    var el=document.getElementById(id);
+                                    if(el) el.style.display='none';
+                                });
+                                var canvas=document.getElementById('artCanvas');
+                                if(canvas){
+                                    canvas.width=Math.max(1,window.innerWidth);
+                                    canvas.height=Math.max(1,window.innerHeight);
+                                }
+                                if(typeof resizeCanvas==='function') resizeCanvas();
+                                if(window.__cosmosNativeFixDone!==true){
+                                    window.__cosmosNativeFixDone=true;
+                                    if(typeof toggleRhythmMode==='function') toggleRhythmMode();
                                 }
                             })();
                         """.trimIndent()
-
-                        view?.evaluateJavascript(script, null)
+                        view?.post {
+                            view.evaluateJavascript(cleanModeScript, null)
+                            view.invalidate()
+                        }
                     }
                 }
 
@@ -212,25 +187,20 @@ class CosmosWallpaperService : WallpaperService() {
                     override fun onPermissionRequest(request: PermissionRequest) {
                         mainHandler.post {
                             val audioOnly = request.resources.isNotEmpty() &&
-                                request.resources.all {
-                                    it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
-                                }
-
-                            val micPermissionGranted = ContextCompat.checkSelfPermission(
+                                request.resources.all { it == PermissionRequest.RESOURCE_AUDIO_CAPTURE }
+                            val micGranted = ContextCompat.checkSelfPermission(
                                 this@CosmosWallpaperService,
                                 Manifest.permission.RECORD_AUDIO
                             ) == PackageManager.PERMISSION_GRANTED
 
-                            if (audioOnly && micPermissionGranted && !engineDestroyed) {
+                            if (audioOnly && micGranted && !engineDestroyed) {
                                 request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
-                            } else {
-                                request.deny()
-                            }
+                            } else request.deny()
                         }
                     }
                 }
 
-                view.loadUrl("file:///android_asset/fondo-celular-audioritmico.html#native-wallpaper")
+                view.loadUrl("file:///android_asset/fondo-celular-audioritmico.html?nativeWallpaper=1")
             } catch (exception: RuntimeException) {
                 android.util.Log.e("CosmosWallpaper", "No se pudo cargar el WebView", exception)
                 webView?.destroy()
@@ -246,19 +216,17 @@ class CosmosWallpaperService : WallpaperService() {
 
         private fun resizeWebView(width: Int, height: Int) {
             if (width <= 0 || height <= 0) return
-
             val view = webView ?: return
             val widthSpec = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY)
             val heightSpec = View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
-
             view.measure(widthSpec, heightSpec)
             view.layout(0, 0, width, height)
-            view.evaluateJavascript("if (typeof resizeCanvas === 'function') resizeCanvas();", null)
+            view.evaluateJavascript("if(typeof resizeCanvas==='function') resizeCanvas();", null)
+            view.invalidate()
         }
 
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
-
             if (visible) {
                 webView?.onResume()
                 scheduleNextFrame()
@@ -275,13 +243,7 @@ class CosmosWallpaperService : WallpaperService() {
         }
 
         private fun scheduleNextFrame() {
-            if (
-                engineDestroyed ||
-                !isVisible ||
-                framePending ||
-                webView == null
-            ) return
-
+            if (engineDestroyed || !isVisible || framePending || webView == null) return
             framePending = true
             mainHandler.postDelayed(drawFrameRunnable, 16L)
         }
@@ -290,7 +252,6 @@ class CosmosWallpaperService : WallpaperService() {
             engineDestroyed = true
             mainHandler.removeCallbacks(drawFrameRunnable)
             framePending = false
-
             webView?.apply {
                 stopLoading()
                 onPause()
@@ -298,7 +259,6 @@ class CosmosWallpaperService : WallpaperService() {
                 destroy()
             }
             webView = null
-
             super.onDestroy()
         }
     }
