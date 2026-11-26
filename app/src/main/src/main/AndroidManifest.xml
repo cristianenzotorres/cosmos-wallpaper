@@ -9,6 +9,7 @@
         android:required="true" />
 
     <application
+        android:name=".CosmosApplication"
         android:allowBackup="false"
         android:label="Cosmos Audiorítmico"
         android:theme="@android:style/Theme.Material.NoActionBar">
@@ -27,11 +28,9 @@
             android:exported="true"
             android:label="Cosmos Fondo Vivo"
             android:permission="android.permission.BIND_WALLPAPER">
-
             <intent-filter>
                 <action android:name="android.service.wallpaper.WallpaperService" />
             </intent-filter>
-
             <meta-data
                 android:name="android.service.wallpaper"
                 android:resource="@xml/wallpaper" />
