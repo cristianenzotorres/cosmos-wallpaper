@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
         }
 
         val subtitle = TextView(this).apply {
-            text = "Este servicio coloca tu visualización interactiva detrás de los íconos de tu celular, reaccionando al tacto y al ritmo de la música en tiempo real."
+            text = "Este servicio coloca tu visualización interactiva como fondo de pantalla en vivo."
             textSize = 15f
             setTextColor(0xFFA1A1AA.toInt())
             setPadding(0, 0, 0, 64)
@@ -133,7 +133,20 @@ class CosmosWallpaperService : WallpaperService() {
 
                 webChromeClient = object : WebChromeClient() {
                     override fun onPermissionRequest(request: PermissionRequest?) {
-                        request?.grant(request.resources)
+                        val requestsOnlyAudio = request?.resources?.all {
+                            it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                        } == true
+
+                        val hasRuntimeMicPermission = ContextCompat.checkSelfPermission(
+                            applicationContext,
+                            Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (requestsOnlyAudio && hasRuntimeMicPermission) {
+                            request.grant(request.resources)
+                        } else {
+                            request?.deny()
+                        }
                     }
                 }
 
